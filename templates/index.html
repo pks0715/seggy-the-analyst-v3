@@ -1,0 +1,1618 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Seggy the Analyst - AI Due Diligence</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #ffffff;
+            min-height: 100vh;
+            padding: 20px;
+            color: #000000;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        
+        .header {
+            background: #f5f5f5;
+            color: #000000;
+            padding: 40px;
+            text-align: center;
+            border-bottom: 2px solid #e0e0e0;
+        }
+        
+        .header h1 {
+            font-size: 2.8em;
+            margin-bottom: 10px;
+            font-weight: 700;
+        }
+        
+        .header p {
+            font-size: 1.2em;
+            color: #333333;
+        }
+        
+        .content {
+            padding: 40px;
+        }
+        
+        .config-section {
+            background: #fafafa;
+            padding: 30px;
+            border-radius: 8px;
+            margin-bottom: 30px;
+            border: 1px solid #e0e0e0;
+        }
+        
+        .config-section h3 {
+            color: #000000;
+            margin-bottom: 20px;
+            font-size: 1.3em;
+            font-weight: 600;
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        .form-group label {
+            display: block;
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: #000000;
+        }
+        
+        .form-group select {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #d0d0d0;
+            border-radius: 6px;
+            font-size: 1em;
+            background: white;
+            cursor: pointer;
+            color: #000000;
+        }
+        
+        .form-group select:focus {
+            outline: none;
+            border-color: #666666;
+        }
+        
+        .checklist-buttons {
+            display: flex;
+            gap: 15px;
+            margin-top: 10px;
+        }
+        
+        .checklist-btn {
+            flex: 1;
+            padding: 15px;
+            border: 2px solid #d0d0d0;
+            background: white;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-align: center;
+        }
+        
+        .checklist-btn:hover {
+            border-color: #666666;
+            background: #f5f5f5;
+        }
+        
+        .checklist-btn.active {
+            background: #000000;
+            color: white;
+            border-color: #000000;
+        }
+        
+        .checklist-btn h4 {
+            margin-bottom: 5px;
+            font-weight: 600;
+        }
+        
+        .checklist-btn p {
+            font-size: 0.9em;
+            opacity: 0.8;
+        }
+        
+        .upload-section {
+            background: #fafafa;
+            border: 3px dashed #d0d0d0;
+            border-radius: 8px;
+            padding: 60px 40px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-bottom: 30px;
+        }
+        
+        .upload-section:hover {
+            border-color: #666666;
+            background: #f0f0f0;
+        }
+        
+        .upload-section.dragging {
+            border-color: #000000;
+            background: #e8e8e8;
+            border-style: solid;
+        }
+        
+        .file-input {
+            display: none;
+        }
+        
+        .upload-text {
+            font-size: 1.2em;
+            color: #000000;
+            margin-bottom: 10px;
+            font-weight: 600;
+        }
+        
+        .upload-subtext {
+            color: #666666;
+            font-size: 0.95em;
+        }
+        
+        .document-checklist {
+            background: white;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 25px;
+            margin-top: 30px;
+            margin-bottom: 30px;
+        }
+        
+        .document-checklist h4 {
+            color: #000000;
+            margin-bottom: 20px;
+            font-size: 1.2em;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        
+        .checklist-summary {
+            font-size: 0.9em;
+            color: #666666;
+            font-weight: normal;
+        }
+        
+        .checklist-items {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        
+        .checklist-item {
+            display: flex;
+            align-items: center;
+            padding: 12px;
+            border-bottom: 1px solid #f0f0f0;
+            transition: all 0.2s;
+            cursor: pointer;
+        }
+        
+        .checklist-item:last-child {
+            border-bottom: none;
+        }
+        
+        .checklist-item:hover {
+            background: #f5f5f5;
+        }
+        
+        .checklist-item.clickable:hover {
+            background: #e8f4ff;
+        }
+        
+        .status-indicator {
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            margin-right: 12px;
+            flex-shrink: 0;
+            border: 2px solid #ddd;
+        }
+        
+        .status-indicator.status-red {
+            background-color: #dc3545;
+            border-color: #dc3545;
+        }
+        
+        .status-indicator.status-yellow {
+            background-color: #ffc107;
+            border-color: #ffc107;
+        }
+        
+        .status-indicator.status-green {
+            background-color: #28a745;
+            border-color: #28a745;
+        }
+        
+        .checklist-item-content {
+            flex: 1;
+        }
+        
+        .checklist-item-title {
+            font-weight: 500;
+            color: #000000;
+            margin-bottom: 2px;
+        }
+        
+        .checklist-item-status {
+            font-size: 0.85em;
+            color: #666666;
+        }
+        
+        .upload-icon-small {
+            margin-left: auto;
+            padding: 5px 10px;
+            background: #007bff;
+            color: white;
+            border-radius: 4px;
+            font-size: 0.85em;
+            font-weight: 500;
+        }
+        
+        .checklist-item:hover .upload-icon-small {
+            background: #0056b3;
+        }
+        
+        .uploaded-files-list {
+            background: #fafafa;
+            padding: 25px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            border: 1px solid #e0e0e0;
+        }
+        
+        .uploaded-files-list h4 {
+            color: #000000;
+            margin-bottom: 15px;
+            font-weight: 600;
+        }
+        
+        .uploaded-file-item {
+            background: white;
+            padding: 12px 15px;
+            margin-bottom: 8px;
+            border-radius: 6px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border: 1px solid #e0e0e0;
+        }
+        
+        .uploaded-file-item:last-child {
+            margin-bottom: 0;
+        }
+        
+        .file-name {
+            color: #000000;
+            font-size: 0.95em;
+        }
+        
+        .file-tag {
+            background: #e8f4ff;
+            color: #0056b3;
+            padding: 3px 8px;
+            border-radius: 3px;
+            font-size: 0.8em;
+            margin-left: 10px;
+        }
+        
+        .remove-file-btn {
+            background: #dc3545;
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.85em;
+            font-weight: 500;
+        }
+        
+        .remove-file-btn:hover {
+            background: #c82333;
+        }
+        
+        .analyze-btn {
+            background: #000000;
+            color: white;
+            border: none;
+            padding: 16px 40px;
+            font-size: 1.1em;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-weight: 600;
+            display: none;
+        }
+        
+        .analyze-btn:hover {
+            background: #333333;
+        }
+        
+        .analyze-btn:disabled {
+            background: #cccccc;
+            cursor: not-allowed;
+        }
+        
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 50px;
+            background: #fafafa;
+            border-radius: 8px;
+            margin-top: 30px;
+            border: 1px solid #e0e0e0;
+        }
+        
+        .spinner {
+            border: 5px solid #f3f3f3;
+            border-top: 5px solid #000000;
+            border-radius: 50%;
+            width: 60px;
+            height: 60px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 25px;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .loading p {
+            color: #000000;
+            margin: 10px 0;
+        }
+        
+        .loading .subtext {
+            color: #666666;
+            font-size: 0.9em;
+        }
+        
+        .report-section {
+            display: none;
+            margin-top: 40px;
+        }
+        
+        .report-section h2 {
+            color: #000000;
+            font-size: 2em;
+            margin-bottom: 25px;
+            font-weight: 700;
+        }
+        
+        .report-actions {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 20px;
+            justify-content: center;
+        }
+        
+        .download-btn, .save-btn {
+            background: #28a745;
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 1em;
+        }
+        
+        .download-btn:hover {
+            background: #218838;
+        }
+        
+        .save-btn {
+            background: #007bff;
+        }
+        
+        .save-btn:hover {
+            background: #0056b3;
+        }
+        
+        .report-content {
+            background: #fafafa;
+            padding: 40px;
+            border-radius: 8px;
+            line-height: 1.8;
+            white-space: pre-wrap;
+            font-size: 0.95em;
+            border: 1px solid #e0e0e0;
+            color: #000000;
+            margin-bottom: 20px;
+        }
+        
+        .error {
+            background: #fff5f5;
+            color: #c53030;
+            padding: 20px;
+            border-radius: 8px;
+            margin-top: 30px;
+            display: none;
+            border-left: 4px solid #c53030;
+        }
+        
+        .new-analysis-btn {
+            background: #666666;
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 500;
+        }
+        
+        .new-analysis-btn:hover {
+            background: #555555;
+        }
+        
+        .progress-bar {
+            margin-top: 15px;
+            background: #e0e0e0;
+            height: 8px;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background: #28a745;
+            transition: width 0.3s ease;
+        }
+        
+        .progress-text {
+            margin-top: 8px;
+            font-size: 0.9em;
+            color: #666666;
+            text-align: center;
+        }
+        
+        .filename-guide {
+            background: #f9f9f9;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 25px;
+            margin-top: 40px;
+        }
+        
+        .filename-guide h4 {
+            color: #000000;
+            margin-bottom: 15px;
+            font-size: 1.1em;
+            font-weight: 600;
+        }
+        
+        .filename-guide p {
+            color: #666666;
+            margin-bottom: 15px;
+            line-height: 1.6;
+        }
+        
+        .filename-examples {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 10px;
+            margin-top: 15px;
+        }
+        
+        .filename-example {
+            background: white;
+            padding: 10px 15px;
+            border-radius: 4px;
+            border: 1px solid #e0e0e0;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+            color: #000000;
+        }
+        
+        .report-history {
+            background: #fafafa;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 25px;
+            margin-bottom: 30px;
+            display: none;
+        }
+        
+        .report-history h3 {
+            color: #000000;
+            margin-bottom: 20px;
+            font-size: 1.3em;
+            font-weight: 600;
+        }
+        
+        .history-empty {
+            color: #666666;
+            text-align: center;
+            padding: 20px;
+            font-style: italic;
+        }
+        
+        .history-item {
+            background: white;
+            padding: 15px;
+            margin-bottom: 10px;
+            border-radius: 6px;
+            border: 1px solid #e0e0e0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .history-item:last-child {
+            margin-bottom: 0;
+        }
+        
+        .history-info {
+            flex: 1;
+        }
+        
+        .history-title {
+            font-weight: 600;
+            color: #000000;
+            margin-bottom: 5px;
+        }
+        
+        .history-meta {
+            font-size: 0.85em;
+            color: #666666;
+        }
+        
+        .history-actions {
+            display: flex;
+            gap: 10px;
+        }
+        
+        .view-btn, .delete-btn {
+            padding: 8px 15px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.9em;
+            font-weight: 500;
+        }
+        
+        .view-btn {
+            background: #007bff;
+            color: white;
+        }
+        
+        .view-btn:hover {
+            background: #0056b3;
+        }
+        
+        .delete-btn {
+            background: #dc3545;
+            color: white;
+        }
+        
+        .delete-btn:hover {
+            background: #c82333;
+        }
+        
+        .success-message {
+            background: #d4edda;
+            color: #155724;
+            padding: 15px;
+            border-radius: 6px;
+            margin-top: 20px;
+            border: 1px solid #c3e6cb;
+            display: none;
+        }
+        
+        /* Modal styles */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+        }
+        
+        .modal-content {
+            background-color: white;
+            margin: 10% auto;
+            padding: 30px;
+            border: 1px solid #888;
+            border-radius: 8px;
+            width: 90%;
+            max-width: 500px;
+        }
+        
+        .modal-header {
+            margin-bottom: 20px;
+        }
+        
+        .modal-header h3 {
+            color: #000000;
+            font-size: 1.3em;
+        }
+        
+        .modal-header p {
+            color: #666666;
+            margin-top: 8px;
+            font-size: 0.95em;
+        }
+        
+        .year-options {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        
+        .year-option {
+            display: flex;
+            align-items: center;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .year-option:hover {
+            background: #f5f5f5;
+            border-color: #666666;
+        }
+        
+        .year-option.uploaded {
+            background: #e8f5e9;
+            border-color: #28a745;
+        }
+        
+        .year-label {
+            flex: 1;
+            font-weight: 500;
+        }
+        
+        .year-status {
+            font-size: 0.85em;
+            color: #28a745;
+        }
+        
+        .close-modal {
+            color: #aaa;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+            line-height: 20px;
+        }
+        
+        .close-modal:hover {
+            color: #000;
+        }
+        
+        .single-upload-btn {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            width: 100%;
+            margin-top: 20px;
+            font-weight: 500;
+        }
+        
+        .single-upload-btn:hover {
+            background: #0056b3;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Seggy the Analyst</h1>
+            <p>The ultimate AI powered due diligence analyst</p>
+        </div>
+        
+        <div class="content">
+            <!-- Report History Section -->
+            <div class="report-history" id="reportHistory">
+                <h3>Report History</h3>
+                <div id="historyContainer">
+                    <div class="history-empty">No saved reports yet. Generate your first report to get started.</div>
+                </div>
+            </div>
+            
+            <!-- Configuration Section -->
+            <div class="config-section">
+                <h3>Configure Your Analysis</h3>
+                
+                <div class="form-group">
+                    <label for="ddType">1. Select Due Diligence Type:</label>
+                    <select id="ddType">
+                        <option value="M&A Due Diligence">M&A Due Diligence</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="reportFocus">2. Select Report Focus:</label>
+                    <select id="reportFocus">
+                        <option value="Financial Report">Financial Report</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label>3. Select Document Checklist Type:</label>
+                    <div class="checklist-buttons">
+                        <div class="checklist-btn active" data-type="Simple">
+                            <h4>Simple Checklist</h4>
+                            <p>Top 20 essential documents</p>
+                        </div>
+                        <div class="checklist-btn" data-type="Detailed">
+                            <h4>Detailed Checklist</h4>
+                            <p>Comprehensive document list (40+ items)</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Document Checklist -->
+            <div class="document-checklist" id="documentChecklist">
+                <h4>
+                    Required Documents
+                    <span class="checklist-summary" id="checklistSummary">0 of 20 completed</span>
+                </h4>
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progressFill" style="width: 0%"></div>
+                </div>
+                <div class="progress-text" id="progressText">Upload documents to begin or click items below to upload specific files</div>
+                <div style="height: 20px"></div>
+                <div class="checklist-items" id="checklistItems">
+                    <!-- Will be populated by JavaScript -->
+                </div>
+            </div>
+            
+            <!-- Upload Section -->
+            <div class="upload-section" id="uploadSection">
+                <div class="upload-text">Drop multiple PDFs or ZIP files here or click to browse</div>
+                <div class="upload-subtext">Supports: PDFs, ZIP archives containing PDFs | ZIP files will be automatically extracted</div>
+                <input type="file" class="file-input" id="fileInput" accept=".pdf,.zip" multiple>
+            </div>
+            
+            <!-- Uploaded Files List -->
+            <div class="uploaded-files-list" id="uploadedFilesList" style="display: none;">
+                <h4>Uploaded Files (<span id="fileCount">0</span>)</h4>
+                <div id="fileListContainer"></div>
+            </div>
+            
+            <center>
+                <button class="analyze-btn" id="analyzeBtn">Generate Due Diligence Report</button>
+            </center>
+            
+            <div class="loading" id="loading">
+                <div class="spinner"></div>
+                <p><strong>Analyzing documents...</strong></p>
+                <p class="subtext">Processing multiple files may take 60-120 seconds</p>
+                <p class="subtext" id="extractingZip" style="display: none;">Extracting ZIP files...</p>
+            </div>
+            
+            <div class="error" id="error">
+                <strong>Error:</strong> <span id="errorMessage"></span>
+            </div>
+            
+            <div class="success-message" id="successMessage">
+                Report saved successfully!
+            </div>
+            
+            <div class="report-section" id="reportSection">
+                <h2>Financial Due Diligence Report</h2>
+                
+                <div class="report-actions">
+                    <button class="download-btn" onclick="downloadReport()">Download Report (Text)</button>
+                    <button class="download-btn" onclick="downloadHTMLReport()">Download Full Report (HTML)</button>
+                    <button class="save-btn" onclick="saveReport()">Save to History</button>
+                </div>
+                
+                <!-- Visual Charts Section -->
+                <div id="chartsSection" style="background: white; padding: 30px; border-radius: 8px; margin-bottom: 30px; border: 1px solid #e0e0e0;">
+                    <h3 style="color: #000000; margin-bottom: 20px; font-size: 1.5em;">Executive Dashboard</h3>
+                    <div id="chartsContainer"></div>
+                </div>
+                
+                <!-- Text Report Section -->
+                <div style="margin-bottom: 20px;">
+                    <h3 style="color: #000000; margin-bottom: 15px;">Detailed Analysis</h3>
+                    <div class="report-content" id="reportContent"></div>
+                </div>
+                
+                <center>
+                    <button class="new-analysis-btn" onclick="resetForm()">New Analysis</button>
+                </center>
+            </div>
+            
+            <!-- Filename Guide -->
+            <div class="filename-guide">
+                <h4>File Naming Best Practices</h4>
+                <p>For optimal document recognition, please name your files using these formats:</p>
+                
+                <div class="filename-examples">
+                    <div class="filename-example">CompanyName_10K_2024.pdf</div>
+                    <div class="filename-example">CompanyName_10Q_Q1_2024.pdf</div>
+                    <div class="filename-example">Balance_Sheet_2024.pdf</div>
+                    <div class="filename-example">Income_Statement_2024.pdf</div>
+                    <div class="filename-example">Cash_Flow_Statement_2024.pdf</div>
+                    <div class="filename-example">Tax_Return_2023.pdf</div>
+                    <div class="filename-example">AR_Aging_Report.pdf</div>
+                    <div class="filename-example">AP_Report_2024.pdf</div>
+                    <div class="filename-example">Debt_Schedule.pdf</div>
+                    <div class="filename-example">Audit_Report_2024.pdf</div>
+                    <div class="filename-example">Customer_Contracts.pdf</div>
+                    <div class="filename-example">Supplier_Agreements.pdf</div>
+                </div>
+                
+                <p style="margin-top: 15px; font-size: 0.9em;">
+                    <strong>Note:</strong> The system automatically detects document types from filenames. 
+                    Including keywords like "10K", "10Q", "Balance Sheet", "Income Statement", "Tax Return", etc. 
+                    helps ensure accurate categorization and analysis.
+                </p>
+                
+                <p style="margin-top: 10px; font-size: 0.9em; font-weight: 600; color: #007bff;">
+                    ZIP File Support: You can upload ZIP archives containing multiple PDFs. The system will automatically 
+                    extract and categorize all PDF files from the archive.
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Year Selection Modal -->
+    <div id="yearModal" class="modal">
+        <div class="modal-content">
+            <span class="close-modal" onclick="closeYearModal()">&times;</span>
+            <div class="modal-header">
+                <h3 id="modalTitle">Select Year</h3>
+                <p id="modalDescription">Choose which year you're uploading</p>
+            </div>
+            <div id="yearOptions" class="year-options">
+                <!-- Will be populated dynamically -->
+            </div>
+            <button class="single-upload-btn" onclick="triggerSingleUpload()">Upload Single Document</button>
+        </div>
+    </div>
+
+    <!-- Hidden file inputs for specific uploads -->
+    <input type="file" id="specificFileInput" accept=".pdf" style="display: none;">
+    <input type="file" id="yearFileInput" accept=".pdf" style="display: none;">
+
+    <script>
+        // Configuration
+        let selectedChecklistType = 'Simple';
+        let uploadedFiles = [];
+        let currentReport = null;
+        let reportHistory = [];
+        let currentChecklistIndex = null;
+        let currentYearSelection = null;
+        let fileMapping = {};
+        
+        // Load report history from localStorage
+        function loadHistory() {
+            const saved = localStorage.getItem('reportHistory');
+            if (saved) {
+                reportHistory = JSON.parse(saved);
+                if (reportHistory.length > 0) {
+                    document.getElementById('reportHistory').style.display = 'block';
+                    renderHistory();
+                }
+            }
+        }
+        
+        // Save report history to localStorage
+        function saveHistory() {
+            localStorage.setItem('reportHistory', JSON.stringify(reportHistory));
+        }
+        
+        // Render history list
+        function renderHistory() {
+            const container = document.getElementById('historyContainer');
+            
+            if (reportHistory.length === 0) {
+                container.innerHTML = '<div class="history-empty">No saved reports yet. Generate your first report to get started.</div>';
+                return;
+            }
+            
+            container.innerHTML = '';
+            
+            reportHistory.forEach((item, index) => {
+                const div = document.createElement('div');
+                div.className = 'history-item';
+                div.innerHTML = `
+                    <div class="history-info">
+                        <div class="history-title">${item.title}</div>
+                        <div class="history-meta">
+                            ${item.date} | ${item.fileCount} files | ${item.ddType} - ${item.reportFocus}
+                        </div>
+                    </div>
+                    <div class="history-actions">
+                        <button class="view-btn" onclick="viewHistoryReport(${index})">View</button>
+                        <button class="delete-btn" onclick="deleteHistoryReport(${index})">Delete</button>
+                    </div>
+                `;
+                container.appendChild(div);
+            });
+        }
+        
+        // View a saved report
+        function viewHistoryReport(index) {
+            const report = reportHistory[index];
+            currentReport = report.content;
+            document.getElementById('reportContent').textContent = report.content;
+            document.getElementById('reportSection').style.display = 'block';
+            document.getElementById('chartsSection').style.display = 'none';
+            document.getElementById('reportSection').scrollIntoView({ behavior: 'smooth' });
+        }
+        
+        // Delete a saved report
+        function deleteHistoryReport(index) {
+            if (confirm('Are you sure you want to delete this report?')) {
+                reportHistory.splice(index, 1);
+                saveHistory();
+                renderHistory();
+                
+                if (reportHistory.length === 0) {
+                    document.getElementById('reportHistory').style.display = 'none';
+                }
+            }
+        }
+        
+        // Save current report to history
+        function saveReport() {
+            if (!currentReport) return;
+            
+            const timestamp = new Date().toLocaleString();
+            const report = {
+                title: `Due Diligence Report - ${new Date().toLocaleDateString()}`,
+                date: timestamp,
+                content: currentReport,
+                fileCount: uploadedFiles.length,
+                ddType: document.getElementById('ddType').value,
+                reportFocus: document.getElementById('reportFocus').value,
+                checklistType: selectedChecklistType
+            };
+            
+            reportHistory.unshift(report);
+            
+            if (reportHistory.length > 20) {
+                reportHistory = reportHistory.slice(0, 20);
+            }
+            
+            saveHistory();
+            renderHistory();
+            document.getElementById('reportHistory').style.display = 'block';
+            
+            const successMsg = document.getElementById('successMessage');
+            successMsg.style.display = 'block';
+            setTimeout(() => {
+                successMsg.style.display = 'none';
+            }, 3000);
+        }
+        
+        // Download report as text file
+        function downloadReport() {
+            if (!currentReport) return;
+            
+            const blob = new Blob([currentReport], { type: 'text/plain' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            
+            const date = new Date().toISOString().split('T')[0];
+            const ddType = document.getElementById('ddType').value.replace(/\s+/g, '_');
+            const reportFocus = document.getElementById('reportFocus').value.replace(/\s+/g, '_');
+            
+            a.download = `${ddType}_${reportFocus}_${date}.txt`;
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+        }
+        
+        // Download full HTML report with charts
+        function downloadHTMLReport() {
+            if (!currentReport) return;
+            
+            const chartsHTML = document.getElementById('chartsContainer').innerHTML;
+            const reportText = document.getElementById('reportContent').textContent;
+            
+            const fullHTML = `
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Due Diligence Report</title>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 40px;
+            background: white;
+            color: #000;
+        }
+        h1 { color: #2c3e50; border-bottom: 3px solid #3498db; padding-bottom: 10px; }
+        h2 { color: #34495e; margin-top: 30px; }
+        .report-text {
+            background: #f8f9fa;
+            padding: 30px;
+            border-radius: 8px;
+            white-space: pre-wrap;
+            line-height: 1.8;
+            margin-top: 30px;
+        }
+        .dashboard {
+            margin: 30px 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>Financial Due Diligence Report</h1>
+    <p><strong>Generated:</strong> ${new Date().toLocaleString()}</p>
+    <p><strong>Platform:</strong> Seggy the Analyst</p>
+    
+    <div class="dashboard">
+        <h2>Executive Dashboard</h2>
+        ${chartsHTML}
+    </div>
+    
+    <div class="report-text">
+        <h2>Detailed Analysis</h2>
+        ${reportText}
+    </div>
+</body>
+</html>
+            `;
+            
+            const blob = new Blob([fullHTML], { type: 'text/html' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            
+            const date = new Date().toISOString().split('T')[0];
+            a.download = `Due_Diligence_Report_${date}.html`;
+            
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+        }
+        
+        // Document checklist configurations with pattern matching
+        const simpleChecklistConfig = [
+            { name: 'Form 10-K (Last 3 Years)', required: 3, patterns: ['10-k', '10k'], years: [2024, 2023, 2022] },
+            { name: 'Form 10-Q (Last 8 Quarters)', required: 8, patterns: ['10-q', '10q'], years: ['Q1 2024', 'Q2 2024', 'Q3 2024', 'Q4 2023', 'Q1 2023', 'Q2 2023', 'Q3 2023', 'Q4 2022'] },
+            { name: 'Most Recent Earnings Release', required: 1, patterns: ['earnings', 'release'] },
+            { name: 'Proxy Statement DEF 14A (Last 2 Years)', required: 2, patterns: ['def 14a', 'def14a', 'proxy'], years: [2024, 2023] },
+            { name: 'Investor Relations Data Supplement', required: 1, patterns: ['investor relations', 'ir data', 'data supplement'] },
+            { name: 'Debt Prospectus/Indentures', required: 1, patterns: ['debt', 'prospectus', 'indenture'] },
+            { name: 'Balance Sheets', required: 1, patterns: ['balance sheet', 'balance_sheet'] },
+            { name: 'Income Statements', required: 1, patterns: ['income statement', 'income_statement', 'profit loss', 'p&l'] },
+            { name: 'Cash Flow Statements', required: 1, patterns: ['cash flow', 'cashflow', 'statement of cash'] },
+            { name: 'Tax Returns (Last 3 Years)', required: 3, patterns: ['tax return', 'tax_return', 'form 1120', '1040'], years: [2023, 2022, 2021] },
+            { name: 'Accounts Receivable Aging Reports', required: 1, patterns: ['accounts receivable', 'ar aging', 'receivable aging', 'a/r'] },
+            { name: 'Accounts Payable Reports', required: 1, patterns: ['accounts payable', 'ap report', 'payable', 'a/p'] },
+            { name: 'Inventory Reports', required: 1, patterns: ['inventory', 'stock report'] },
+            { name: 'Fixed Assets List', required: 1, patterns: ['fixed asset', 'asset list', 'ppe', 'property plant equipment'] },
+            { name: 'Debt Schedule', required: 1, patterns: ['debt schedule', 'loan agreement', 'credit facility'] },
+            { name: 'Customer Contracts', required: 1, patterns: ['customer contract', 'sales contract', 'customer agreement'] },
+            { name: 'Supplier Agreements', required: 1, patterns: ['supplier', 'vendor agreement', 'purchase agreement'] },
+            { name: 'Credit Reports', required: 1, patterns: ['credit report', 'credit rating'] },
+            { name: 'Audit Reports', required: 1, patterns: ['audit report', 'auditor', 'independent audit'] },
+            { name: 'Management Projections', required: 1, patterns: ['projection', 'forecast', 'budget'] }
+        ];
+        
+        const detailedChecklistConfig = [
+            ...simpleChecklistConfig,
+            { name: 'Form 10-K (Years 4-5)', required: 2, patterns: ['10-k', '10k'], years: [2021, 2020] },
+            { name: 'Form 10-Q (Quarters 9-12)', required: 4, patterns: ['10-q', '10q'], years: ['Q1 2022', 'Q2 2022', 'Q3 2022', 'Q4 2021'] },
+            { name: 'All Form 8-Ks (Last 2 Years)', required: 5, patterns: ['8-k', '8k'] },
+            { name: 'Forms 3, 4, and 5 (Insider Trading)', required: 3, patterns: ['form 3', 'form 4', 'form 5', 'insider'] },
+            { name: 'Schedule 13D/13G Filings', required: 1, patterns: ['13d', '13g', 'schedule 13'] },
+            { name: 'Statement of Shareholders Equity', required: 1, patterns: ['shareholders equity', 'stockholders equity', 'equity statement'] },
+            { name: 'Tax Audit Reports', required: 1, patterns: ['tax audit', 'irs audit'] },
+            { name: 'Deferred Tax Analysis', required: 1, patterns: ['deferred tax', 'tax deferral'] },
+            { name: 'Depreciation Schedules', required: 1, patterns: ['depreciation', 'amortization schedule'] },
+            { name: 'Intangible Assets Valuation', required: 1, patterns: ['intangible', 'goodwill', 'patent valuation'] },
+            { name: 'Credit Facility Documents', required: 1, patterns: ['credit facility', 'credit agreement', 'revolving credit'] },
+            { name: 'Lease Agreements', required: 1, patterns: ['lease', 'rental agreement'] },
+            { name: 'Employment Agreements', required: 1, patterns: ['employment agreement', 'employment contract'] },
+            { name: 'Stock Option Plans', required: 1, patterns: ['stock option', 'equity plan', 'esop'] },
+            { name: 'Pension Plan Documents', required: 1, patterns: ['pension', '401k', 'retirement plan'] },
+            { name: 'Insurance Policies', required: 1, patterns: ['insurance', 'policy'] },
+            { name: 'Litigation Documents', required: 1, patterns: ['litigation', 'lawsuit', 'legal proceeding'] },
+            { name: 'Regulatory Filings', required: 1, patterns: ['regulatory', 'compliance filing'] },
+            { name: 'IT Systems Documentation', required: 1, patterns: ['it system', 'technology', 'software'] },
+            { name: 'Intellectual Property List', required: 1, patterns: ['intellectual property', 'ip', 'patent list', 'trademark'] }
+        ];
+        
+        let checklistState = {};
+        
+        // DOM elements
+        const uploadSection = document.getElementById('uploadSection');
+        const fileInput = document.getElementById('fileInput');
+        const specificFileInput = document.getElementById('specificFileInput');
+        const yearFileInput = document.getElementById('yearFileInput');
+        const analyzeBtn = document.getElementById('analyzeBtn');
+        const loading = document.getElementById('loading');
+        const reportSection = document.getElementById('reportSection');
+        const reportContent = document.getElementById('reportContent');
+        const errorDiv = document.getElementById('error');
+        const errorMessage = document.getElementById('errorMessage');
+        const documentChecklist = document.getElementById('documentChecklist');
+        const checklistItems = document.getElementById('checklistItems');
+        const uploadedFilesList = document.getElementById('uploadedFilesList');
+        const fileListContainer = document.getElementById('fileListContainer');
+        const fileCount = document.getElementById('fileCount');
+        const checklistSummary = document.getElementById('checklistSummary');
+        const progressFill = document.getElementById('progressFill');
+        const progressText = document.getElementById('progressText');
+        const yearModal = document.getElementById('yearModal');
+        
+        // Initialize
+        loadHistory();
+        
+        // Checklist type selection
+        document.querySelectorAll('.checklist-btn').forEach(btn => {
+            btn.addEventListener('click', function() {
+                document.querySelectorAll('.checklist-btn').forEach(b => b.classList.remove('active'));
+                this.classList.add('active');
+                selectedChecklistType = this.getAttribute('data-type');
+                updateChecklist();
+                updateChecklistStatus();
+            });
+        });
+        
+        // Initialize checklist
+        function updateChecklist() {
+            const config = selectedChecklistType === 'Simple' ? simpleChecklistConfig : detailedChecklistConfig;
+            
+            checklistState = {};
+            config.forEach((item, index) => {
+                checklistState[index] = { 
+                    uploaded: 0, 
+                    required: item.required,
+                    files: [],
+                    yearFiles: item.years ? {} : null
+                };
+                if (item.years) {
+                    item.years.forEach(year => {
+                        checklistState[index].yearFiles[year] = null;
+                    });
+                }
+            });
+            
+            checklistItems.innerHTML = '';
+            
+            config.forEach((item, index) => {
+                const div = document.createElement('div');
+                div.className = 'checklist-item clickable';
+                div.setAttribute('data-index', index);
+                div.onclick = () => openChecklistUpload(index);
+                div.innerHTML = `
+                    <div class="status-indicator status-red"></div>
+                    <div class="checklist-item-content">
+                        <div class="checklist-item-title">${item.name}</div>
+                        <div class="checklist-item-status">0 of ${item.required} uploaded</div>
+                    </div>
+                    <div class="upload-icon-small">Upload</div>
+                `;
+                checklistItems.appendChild(div);
+            });
+            
+            updateSummary();
+        }
+        
+        // Open upload modal for specific checklist item
+        function openChecklistUpload(index) {
+            const config = selectedChecklistType === 'Simple' ? simpleChecklistConfig : detailedChecklistConfig;
+            const item = config[index];
+            currentChecklistIndex = index;
+            
+            document.getElementById('modalTitle').textContent = item.name;
+            
+            if (item.years && item.years.length > 0) {
+                document.getElementById('modalDescription').textContent = 'Select the year for this document:';
+                const yearOptions = document.getElementById('yearOptions');
+                yearOptions.innerHTML = '';
+                
+                item.years.forEach(year => {
+                    const uploaded = checklistState[index].yearFiles[year];
+                    const div = document.createElement('div');
+                    div.className = 'year-option' + (uploaded ? ' uploaded' : '');
+                    div.onclick = () => selectYear(year);
+                    div.innerHTML = `
+                        <span class="year-label">${year}</span>
+                        ${uploaded ? '<span class="year-status">Uploaded ✓</span>' : ''}
+                    `;
+                    yearOptions.appendChild(div);
+                });
+                
+                document.querySelector('.single-upload-btn').style.display = 'none';
+            } else {
+                document.getElementById('modalDescription').textContent = 'Click below to upload this document:';
+                document.getElementById('yearOptions').innerHTML = '';
+                document.querySelector('.single-upload-btn').style.display = 'block';
+            }
+            
+            yearModal.style.display = 'block';
+        }
+        
+        // Select year for multi-year requirements
+        function selectYear(year) {
+            currentYearSelection = year;
+            yearFileInput.click();
+        }
+        
+        // Trigger single upload (no year selection)
+        function triggerSingleUpload() {
+            currentYearSelection = null;
+            specificFileInput.click();
+        }
+        
+        // Close year modal
+        function closeYearModal() {
+            yearModal.style.display = 'none';
+            currentChecklistIndex = null;
+            currentYearSelection = null;
+        }
+        
+        // Handle specific file input for single uploads
+        specificFileInput.addEventListener('change', (e) => {
+            const files = Array.from(e.target.files);
+            if (files.length > 0 && currentChecklistIndex !== null) {
+                handleSpecificUpload(files, currentChecklistIndex, null);
+            }
+            specificFileInput.value = '';
+        });
+        
+        // Handle year-specific file input
+        yearFileInput.addEventListener('change', (e) => {
+            const files = Array.from(e.target.files);
+            if (files.length > 0 && currentChecklistIndex !== null && currentYearSelection !== null) {
+                handleSpecificUpload(files, currentChecklistIndex, currentYearSelection);
+            }
+            yearFileInput.value = '';
+        });
+        
+        // Handle specific upload from checklist
+        function handleSpecificUpload(files, checklistIndex, year) {
+            const config = selectedChecklistType === 'Simple' ? simpleChecklistConfig : detailedChecklistConfig;
+            
+            files.forEach(file => {
+                uploadedFiles.push(file);
+                
+                if (!fileMapping[file.name]) {
+                    fileMapping[file.name] = [];
+                }
+                fileMapping[file.name].push({ index: checklistIndex, year: year });
+                
+                if (year) {
+                    checklistState[checklistIndex].yearFiles[year] = file.name;
+                }
+                checklistState[checklistIndex].files.push(file.name);
+                if (checklistState[checklistIndex].uploaded < checklistState[checklistIndex].required) {
+                    checklistState[checklistIndex].uploaded++;
+                }
+            });
+            
+            updateFileList();
+            updateChecklistStatus();
+            analyzeBtn.style.display = 'inline-block';
+            closeYearModal();
+        }
+        
+        // Match filename to checklist items
+        function matchFileToChecklist(filename) {
+            const config = selectedChecklistType === 'Simple' ? simpleChecklistConfig : detailedChecklistConfig;
+            const lowerFilename = filename.toLowerCase();
+            const matches = [];
+            
+            config.forEach((item, index) => {
+                const hasMatch = item.patterns.some(pattern => 
+                    lowerFilename.includes(pattern.toLowerCase())
+                );
+                
+                if (hasMatch) {
+                    matches.push(index);
+                }
+            });
+            
+            return matches;
+        }
+        
+        // Update checklist status based on uploaded files
+        function updateChecklistStatus() {
+            const config = selectedChecklistType === 'Simple' ? simpleChecklistConfig : detailedChecklistConfig;
+            
+            Object.keys(checklistState).forEach(key => {
+                const specificCount = checklistState[key].files.length;
+                checklistState[key].uploaded = specificCount;
+            });
+            
+            uploadedFiles.forEach(file => {
+                const isSpecific = fileMapping[file.name] && fileMapping[file.name].length > 0;
+                if (!isSpecific) {
+                    const matches = matchFileToChecklist(file.name);
+                    matches.forEach(matchIndex => {
+                        if (checklistState[matchIndex].uploaded < checklistState[matchIndex].required) {
+                            checklistState[matchIndex].uploaded++;
+                        }
+                    });
+                }
+            });
+            
+            Object.keys(checklistState).forEach(index => {
+                const state = checklistState[index];
+                const item = document.querySelector(`.checklist-item[data-index="${index}"]`);
+                if (!item) return;
+                
+                const indicator = item.querySelector('.status-indicator');
+                const statusText = item.querySelector('.checklist-item-status');
+                
+                indicator.classList.remove('status-red', 'status-yellow', 'status-green');
+                
+                if (state.uploaded === 0) {
+                    indicator.classList.add('status-red');
+                } else if (state.uploaded < state.required) {
+                    indicator.classList.add('status-yellow');
+                } else {
+                    indicator.classList.add('status-green');
+                }
+                
+                statusText.textContent = `${state.uploaded} of ${state.required} uploaded`;
+            });
+            
+            updateSummary();
+        }
+        
+        // Update summary and progress bar
+        function updateSummary() {
+            const config = selectedChecklistType === 'Simple' ? simpleChecklistConfig : detailedChecklistConfig;
+            const totalItems = config.length;
+            let completedItems = 0;
+            
+            Object.keys(checklistState).forEach(key => {
+                const state = checklistState[key];
+                if (state.uploaded >= state.required) {
+                    completedItems++;
+                }
+            });
+            
+            const percentage = Math.round((completedItems / totalItems) * 100);
+            
+            checklistSummary.textContent = `${completedItems} of ${totalItems} completed`;
+            progressFill.style.width = `${percentage}%`;
+            
+            if (completedItems === 0) {
+                progressText.textContent = 'Upload documents to begin or click items below to upload specific files';
+            } else if (completedItems === totalItems) {
+                progressText.textContent = 'All required documents uploaded!';
+            } else {
+                progressText.textContent = `${percentage}% complete - ${totalItems - completedItems} items remaining`;
+            }
+        }
+        
+        // Initialize
+        updateChecklist();
+        
+        // File upload handling
+        uploadSection.addEventListener('click', () => fileInput.click());
+        
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            uploadSection.addEventListener(eventName, (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+            });
+        });
+        
+        ['dragenter', 'dragover'].forEach(eventName => {
+            uploadSection.addEventListener(eventName, () => {
+                uploadSection.classList.add('dragging');
+            });
+        });
+        
+        ['dragleave', 'drop'].forEach(eventName => {
+            uploadSection.addEventListener(eventName, () => {
+                uploadSection.classList.remove('dragging');
+            });
+        });
+        
+        uploadSection.addEventListener('drop', (e) => {
+            const dt = e.dataTransfer;
+            const files = Array.from(dt.files);
+            handleFiles(files);
+        });
+        
+        fileInput.addEventListener('change', (e) => {
+            const files = Array.from(e.target.files);
+            handleFiles(files);
+        });
+        
+        function handleFiles(files) {
+            const hasZip = files.some(f => f.name.toLowerCase().endsWith('.zip'));
+            
+            if (hasZip) {
+                document.getElementById('extractingZip').style.display = 'block';
+            }
+            
+            uploadedFiles = [...uploadedFiles, ...files];
+            updateFileList();
+            updateChecklistStatus();
+            analyzeBtn.style.display = 'inline-block';
+            errorDiv.style.display = 'none';
+            
+            if (hasZip) {
+                setTimeout(() => {
+                    document.getElementById('extractingZip').style.display = 'none';
+                }, 2000);
+            }
+        }
+        
+        function updateFileList() {
+            if (uploadedFiles.length === 0) {
+                uploadedFilesList.style.display = 'none';
+                return;
+            }
+            
+            uploadedFilesList.style.display = 'block';
+            fileCount.textContent = uploadedFiles.length;
+            fileListContainer.innerHTML = '';
+            
+            uploadedFiles.forEach((file, index) => {
+                const div = document.createElement('div');
+                div.className = 'uploaded-file-item';
+                
+                const mapping = fileMapping[file.name];
+                let tagHtml = '';
+                if (mapping && mapping.length > 0) {
+                    const config = selectedChecklistType === 'Simple' ? simpleChecklistConfig : detailedChecklistConfig;
+                    const itemName = config[mapping[0].index].name;
+                    const shortName = itemName.split('(')[0].trim();
+                    tagHtml = `<span class="file-tag">${shortName}${mapping[0].year ? ' - ' + mapping[0].year : ''}</span>`;
+                }
+                
+                const isZip = file.name.toLowerCase().endsWith('.zip');
+                const zipTag = isZip ? '<span class="file-tag" style="background: #fff3cd; color: #856404;">ZIP Archive</span>' : '';
+                
+                div.innerHTML = `
+                    <div>
+                        <span class="file-name">${file.name}</span>
+                        ${tagHtml}
+                        ${zipTag}
+                    </div>
+                    <button class="remove-file-btn" onclick="removeFile(${index})">Remove</button>
+                `;
+                fileListContainer.appendChild(div);
+            });
+        }
+        
+        function removeFile(index) {
+            const file = uploadedFiles[index];
+            
+            if (fileMapping[file.name]) {
+                fileMapping[file.name].forEach(mapping => {
+                    const state = checklistState[mapping.index];
+                    const fileIndex = state.files.indexOf(file.name);
+                    if (fileIndex > -1) {
+                        state.files.splice(fileIndex, 1);
+                        state.uploaded = Math.max(0, state.uploaded - 1);
+                    }
+                    if (mapping.year && state.yearFiles) {
+                        state.yearFiles[mapping.year] = null;
+                    }
+                });
+                delete fileMapping[file.name];
+            }
+            
+            uploadedFiles.splice(index, 1);
+            updateFileList();
+            updateChecklistStatus(); 
+                  if (uploadedFiles.length === 0) {
+                analyzeBtn.style.display = 'none';
+            }
+        }
+        
+        // Analyze button click handler
+        analyzeBtn.addEventListener('click', async () => {
+            if (uploadedFiles.length === 0) {
+                alert('Please upload at least one file');
+                return;
+            }
+            
+            loading.style.display = 'block';
+            reportSection.style.display = 'none';
+            errorDiv.style.display = 'none';
+            analyzeBtn.disabled = true;
+            
+            const formData = new FormData();
+            formData.append('dd_type', document.getElementById('ddType').value);
+            formData.append('report_focus', document.getElementById('reportFocus').value);
+            formData.append('checklist_type', selectedChecklistType);
+            
+            uploadedFiles.forEach(file => {
+                formData.append('files', file);
+            });
+            
+            try {
+                const response = await fetch('/analyze', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error || 'Analysis failed');
+                }
+                
+                const data = await response.json();
+                
+                currentReport = data.report;
+                reportContent.textContent = data.report;
+                
+                if (data.charts) {
+                    document.getElementById('chartsContainer').innerHTML = data.charts;
+                    document.getElementById('chartsSection').style.display = 'block';
+                } else {
+                    document.getElementById('chartsSection').style.display = 'none';
+                }
+                
+                loading.style.display = 'none';
+                reportSection.style.display = 'block';
+                reportSection.scrollIntoView({ behavior: 'smooth' });
+                
+            } catch (error) {
+                loading.style.display = 'none';
+                errorDiv.style.display = 'block';
+                errorMessage.textContent = error.message;
+                analyzeBtn.disabled = false;
+            }
+        });
+        
+        // Reset form
+        function resetForm() {
+            uploadedFiles = [];
+            currentReport = null;
+            fileMapping = {};
+            updateFileList();
+            updateChecklist();
+            reportSection.style.display = 'none';
+            errorDiv.style.display = 'none';
+            analyzeBtn.style.display = 'none';
+            analyzeBtn.disabled = false;
+            fileInput.value = '';
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+        
+        // Close modal when clicking outside
+        window.onclick = function(event) {
+            if (event.target == yearModal) {
+                closeYearModal();
+            }
+        }
+    </script>
+</body>
+</html>
