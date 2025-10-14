@@ -1,0 +1,1 @@
+# seggy-the-analyst-v3
