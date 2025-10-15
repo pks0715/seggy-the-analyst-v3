@@ -620,7 +620,6 @@
             display: none;
         }
         
-        /* Modal styles */
         .modal {
             display: none;
             position: fixed;
@@ -731,7 +730,6 @@
         </div>
         
         <div class="content">
-            <!-- Report History Section -->
             <div class="report-history" id="reportHistory">
                 <h3>Report History</h3>
                 <div id="historyContainer">
@@ -739,7 +737,6 @@
                 </div>
             </div>
             
-            <!-- Configuration Section -->
             <div class="config-section">
                 <h3>Configure Your Analysis</h3>
                 
@@ -772,7 +769,6 @@
                 </div>
             </div>
             
-            <!-- Document Checklist -->
             <div class="document-checklist" id="documentChecklist">
                 <h4>
                     Required Documents
@@ -783,19 +779,15 @@
                 </div>
                 <div class="progress-text" id="progressText">Upload documents to begin or click items below to upload specific files</div>
                 <div style="height: 20px"></div>
-                <div class="checklist-items" id="checklistItems">
-                    <!-- Will be populated by JavaScript -->
-                </div>
+                <div class="checklist-items" id="checklistItems"></div>
             </div>
             
-            <!-- Upload Section -->
             <div class="upload-section" id="uploadSection">
                 <div class="upload-text">Drop multiple PDFs or ZIP files here or click to browse</div>
                 <div class="upload-subtext">Supports: PDFs, ZIP archives containing PDFs | ZIP files will be automatically extracted</div>
                 <input type="file" class="file-input" id="fileInput" accept=".pdf,.zip" multiple>
             </div>
             
-            <!-- Uploaded Files List -->
             <div class="uploaded-files-list" id="uploadedFilesList" style="display: none;">
                 <h4>Uploaded Files (<span id="fileCount">0</span>)</h4>
                 <div id="fileListContainer"></div>
@@ -829,13 +821,11 @@
                     <button class="save-btn" onclick="saveReport()">Save to History</button>
                 </div>
                 
-                <!-- Visual Charts Section -->
                 <div id="chartsSection" style="background: white; padding: 30px; border-radius: 8px; margin-bottom: 30px; border: 1px solid #e0e0e0;">
                     <h3 style="color: #000000; margin-bottom: 20px; font-size: 1.5em;">Executive Dashboard</h3>
                     <div id="chartsContainer"></div>
                 </div>
                 
-                <!-- Text Report Section -->
                 <div style="margin-bottom: 20px;">
                     <h3 style="color: #000000; margin-bottom: 15px;">Detailed Analysis</h3>
                     <div class="report-content" id="reportContent"></div>
@@ -846,7 +836,6 @@
                 </center>
             </div>
             
-            <!-- Filename Guide -->
             <div class="filename-guide">
                 <h4>File Naming Best Practices</h4>
                 <p>For optimal document recognition, please name your files using these formats:</p>
@@ -880,7 +869,6 @@
         </div>
     </div>
 
-    <!-- Year Selection Modal -->
     <div id="yearModal" class="modal">
         <div class="modal-content">
             <span class="close-modal" onclick="closeYearModal()">&times;</span>
@@ -888,19 +876,15 @@
                 <h3 id="modalTitle">Select Year</h3>
                 <p id="modalDescription">Choose which year you're uploading</p>
             </div>
-            <div id="yearOptions" class="year-options">
-                <!-- Will be populated dynamically -->
-            </div>
+            <div id="yearOptions" class="year-options"></div>
             <button class="single-upload-btn" onclick="triggerSingleUpload()">Upload Single Document</button>
         </div>
     </div>
 
-    <!-- Hidden file inputs for specific uploads -->
     <input type="file" id="specificFileInput" accept=".pdf" style="display: none;">
     <input type="file" id="yearFileInput" accept=".pdf" style="display: none;">
 
     <script>
-        // Configuration
         let selectedChecklistType = 'Simple';
         let uploadedFiles = [];
         let currentReport = null;
@@ -909,7 +893,6 @@
         let currentYearSelection = null;
         let fileMapping = {};
         
-        // Load report history from localStorage
         function loadHistory() {
             const saved = localStorage.getItem('reportHistory');
             if (saved) {
@@ -921,12 +904,10 @@
             }
         }
         
-        // Save report history to localStorage
         function saveHistory() {
             localStorage.setItem('reportHistory', JSON.stringify(reportHistory));
         }
         
-        // Render history list
         function renderHistory() {
             const container = document.getElementById('historyContainer');
             
@@ -956,7 +937,6 @@
             });
         }
         
-        // View a saved report
         function viewHistoryReport(index) {
             const report = reportHistory[index];
             currentReport = report.content;
@@ -966,7 +946,6 @@
             document.getElementById('reportSection').scrollIntoView({ behavior: 'smooth' });
         }
         
-        // Delete a saved report
         function deleteHistoryReport(index) {
             if (confirm('Are you sure you want to delete this report?')) {
                 reportHistory.splice(index, 1);
@@ -979,7 +958,6 @@
             }
         }
         
-        // Save current report to history
         function saveReport() {
             if (!currentReport) return;
             
@@ -1011,7 +989,6 @@
             }, 3000);
         }
         
-        // Download report as text file
         function downloadReport() {
             if (!currentReport) return;
             
@@ -1031,77 +1008,6 @@
             document.body.removeChild(a);
         }
         
-        // Download full HTML report with charts
-        function downloadHTMLReport() {
-            if (!currentReport) return;
-            
-            const chartsHTML = document.getElementById('chartsContainer').innerHTML;
-            const reportText = document.getElementById('reportContent').textContent;
-            
-            const fullHTML = `
-<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="UTF-8">
-    <title>Due Diligence Report</title>
-    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 40px;
-            background: white;
-            color: #000;
-        }
-        h1 { color: #2c3e50; border-bottom: 3px solid #3498db; padding-bottom: 10px; }
-        h2 { color: #34495e; margin-top: 30px; }
-        .report-text {
-            background: #f8f9fa;
-            padding: 30px;
-            border-radius: 8px;
-            white-space: pre-wrap;
-            line-height: 1.8;
-            margin-top: 30px;
-        }
-        .dashboard {
-            margin: 30px 0;
-        }
-    </style>
-</head>
-<body>
-    <h1>Financial Due Diligence Report</h1>
-    <p><strong>Generated:</strong> ${new Date().toLocaleString()}</p>
-    <p><strong>Platform:</strong> Seggy the Analyst</p>
-    
-    <div class="dashboard">
-        <h2>Executive Dashboard</h2>
-        ${chartsHTML}
-    </div>
-    
-    <div class="report-text">
-        <h2>Detailed Analysis</h2>
-        ${reportText}
-    </div>
-</body>
-</html>
-            `;
-            
-            const blob = new Blob([fullHTML], { type: 'text/html' });
-            const url = window.URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            
-            const date = new Date().toISOString().split('T')[0];
-            a.download = `Due_Diligence_Report_${date}.html`;
-            
-            document.body.appendChild(a);
-            a.click();
-            window.URL.revokeObjectURL(url);
-            document.body.removeChild(a);
-        }
-        
-        // Document checklist configurations with pattern matching
         const simpleChecklistConfig = [
             { name: 'Form 10-K (Last 3 Years)', required: 3, patterns: ['10-k', '10k'], years: [2024, 2023, 2022] },
             { name: 'Form 10-Q (Last 8 Quarters)', required: 8, patterns: ['10-q', '10q'], years: ['Q1 2024', 'Q2 2024', 'Q3 2024', 'Q4 2023', 'Q1 2023', 'Q2 2023', 'Q3 2023', 'Q4 2022'] },
@@ -1151,7 +1057,6 @@
         
         let checklistState = {};
         
-        // DOM elements
         const uploadSection = document.getElementById('uploadSection');
         const fileInput = document.getElementById('fileInput');
         const specificFileInput = document.getElementById('specificFileInput');
@@ -1172,10 +1077,8 @@
         const progressText = document.getElementById('progressText');
         const yearModal = document.getElementById('yearModal');
         
-        // Initialize
         loadHistory();
         
-        // Checklist type selection
         document.querySelectorAll('.checklist-btn').forEach(btn => {
             btn.addEventListener('click', function() {
                 document.querySelectorAll('.checklist-btn').forEach(b => b.classList.remove('active'));
@@ -1186,7 +1089,6 @@
             });
         });
         
-        // Initialize checklist
         function updateChecklist() {
             const config = selectedChecklistType === 'Simple' ? simpleChecklistConfig : detailedChecklistConfig;
             
@@ -1226,7 +1128,6 @@
             updateSummary();
         }
         
-        // Open upload modal for specific checklist item
         function openChecklistUpload(index) {
             const config = selectedChecklistType === 'Simple' ? simpleChecklistConfig : detailedChecklistConfig;
             const item = config[index];
@@ -1261,26 +1162,22 @@
             yearModal.style.display = 'block';
         }
         
-        // Select year for multi-year requirements
         function selectYear(year) {
             currentYearSelection = year;
             yearFileInput.click();
         }
         
-        // Trigger single upload (no year selection)
         function triggerSingleUpload() {
             currentYearSelection = null;
             specificFileInput.click();
         }
         
-        // Close year modal
         function closeYearModal() {
             yearModal.style.display = 'none';
             currentChecklistIndex = null;
             currentYearSelection = null;
         }
         
-        // Handle specific file input for single uploads
         specificFileInput.addEventListener('change', (e) => {
             const files = Array.from(e.target.files);
             if (files.length > 0 && currentChecklistIndex !== null) {
@@ -1289,7 +1186,6 @@
             specificFileInput.value = '';
         });
         
-        // Handle year-specific file input
         yearFileInput.addEventListener('change', (e) => {
             const files = Array.from(e.target.files);
             if (files.length > 0 && currentChecklistIndex !== null && currentYearSelection !== null) {
@@ -1298,7 +1194,6 @@
             yearFileInput.value = '';
         });
         
-        // Handle specific upload from checklist
         function handleSpecificUpload(files, checklistIndex, year) {
             const config = selectedChecklistType === 'Simple' ? simpleChecklistConfig : detailedChecklistConfig;
             
@@ -1325,7 +1220,6 @@
             closeYearModal();
         }
         
-        // Match filename to checklist items
         function matchFileToChecklist(filename) {
             const config = selectedChecklistType === 'Simple' ? simpleChecklistConfig : detailedChecklistConfig;
             const lowerFilename = filename.toLowerCase();
@@ -1344,7 +1238,6 @@
             return matches;
         }
         
-        // Update checklist status based on uploaded files
         function updateChecklistStatus() {
             const config = selectedChecklistType === 'Simple' ? simpleChecklistConfig : detailedChecklistConfig;
             
@@ -1389,7 +1282,6 @@
             updateSummary();
         }
         
-        // Update summary and progress bar
         function updateSummary() {
             const config = selectedChecklistType === 'Simple' ? simpleChecklistConfig : detailedChecklistConfig;
             const totalItems = config.length;
@@ -1416,10 +1308,8 @@
             }
         }
         
-        // Initialize
         updateChecklist();
         
-        // File upload handling
         uploadSection.addEventListener('click', () => fileInput.click());
         
         ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
@@ -1530,13 +1420,13 @@
             
             uploadedFiles.splice(index, 1);
             updateFileList();
-            updateChecklistStatus(); 
-                  if (uploadedFiles.length === 0) {
+            updateChecklistStatus();
+            
+            if (uploadedFiles.length === 0) {
                 analyzeBtn.style.display = 'none';
             }
         }
         
-        // Analyze button click handler
         analyzeBtn.addEventListener('click', async () => {
             if (uploadedFiles.length === 0) {
                 alert('Please upload at least one file');
@@ -1592,7 +1482,6 @@
             }
         });
         
-        // Reset form
         function resetForm() {
             uploadedFiles = [];
             currentReport = null;
@@ -1607,7 +1496,6 @@
             window.scrollTo({ top: 0, behavior: 'smooth' });
         }
         
-        // Close modal when clicking outside
         window.onclick = function(event) {
             if (event.target == yearModal) {
                 closeYearModal();
@@ -1616,3 +1504,72 @@
     </script>
 </body>
 </html>
+        
+        function downloadHTMLReport() {
+            if (!currentReport) return;
+            
+            const chartsHTML = document.getElementById('chartsContainer').innerHTML;
+            const reportText = document.getElementById('reportContent').textContent;
+            
+            const fullHTML = `
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Due Diligence Report</title>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 40px;
+            background: white;
+            color: #000;
+        }
+        h1 { color: #2c3e50; border-bottom: 3px solid #3498db; padding-bottom: 10px; }
+        h2 { color: #34495e; margin-top: 30px; }
+        .report-text {
+            background: #f8f9fa;
+            padding: 30px;
+            border-radius: 8px;
+            white-space: pre-wrap;
+            line-height: 1.8;
+            margin-top: 30px;
+        }
+        .dashboard {
+            margin: 30px 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>Financial Due Diligence Report</h1>
+    <p><strong>Generated:</strong> ${new Date().toLocaleString()}</p>
+    <p><strong>Platform:</strong> Seggy the Analyst</p>
+    
+    <div class="dashboard">
+        <h2>Executive Dashboard</h2>
+        ${chartsHTML}
+    </div>
+    
+    <div class="report-text">
+        <h2>Detailed Analysis</h2>
+        ${reportText}
+    </div>
+</body>
+</html>
+            `;
+            
+            const blob = new Blob([fullHTML], { type: 'text/html' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            
+            const date = new Date().toISOString().split('T')[0];
+            a.download = `Due_Diligence_Report_${date}.html`;
+            
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+        }
