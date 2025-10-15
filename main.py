@@ -16,8 +16,12 @@ print("Initializing API clients...")
 # Cohere (Primary for summarization)
 cohere_client = None
 try:
-    cohere_client = cohere.ClientV2(api_key=os.environ.get('COHERE_API_KEY'))
-    print("✓ Cohere initialized")
+    cohere_api_key = os.environ.get('COHERE_API_KEY')
+    if cohere_api_key:
+        cohere_client = cohere.ClientV2(api_key=cohere_api_key)
+        print("✓ Cohere initialized")
+    else:
+        print("✗ Cohere key missing")
 except Exception as e:
     print(f"✗ Cohere failed: {e}")
 
@@ -26,7 +30,7 @@ openrouter_key = os.environ.get('OPENROUTER_API_KEY')
 if openrouter_key:
     print("✓ OpenRouter key available")
 else:
-    print("✗ OpenRouter key missing")
+    print("✗ OpenRouter key missing - REQUIRED")
 
 # HuggingFace (For metric extraction)
 huggingface_key = os.environ.get('HUGGINGFACE_API_KEY')
@@ -45,6 +49,10 @@ def home():
 def analyze():
     try:
         start_time = time.time()
+        
+        # Check if OpenRouter key exists
+        if not openrouter_key:
+            return jsonify({'error': 'OpenRouter API key not configured. Please add OPENROUTER_API_KEY to environment variables.'}), 500
         
         dd_type = request.form.get('dd_type', 'M&A Due Diligence')
         report_focus = request.form.get('report_focus', 'Financial Report')
@@ -86,36 +94,52 @@ def analyze():
                     })
         
         if not all_documents:
-            return jsonify({'error': 'Could not extract text from any files'}), 400
+            return jsonify({'error': 'Could not extract text from any files. Please ensure files are valid PDFs.'}), 400
         
         print(f"Extracted text from {len(all_documents)} documents")
         
-        # STEP 1: Summarize with Cohere
+        # STEP 1: Summarize with Cohere (optional - skip if fails)
         print("Step 1: Summarizing documents with Cohere...")
-        summarized_docs = summarize_documents_cohere(all_documents)
+        try:
+            summarized_docs = summarize_documents_cohere(all_documents)
+        except Exception as e:
+            print(f"Cohere summarization failed: {e}. Using truncated originals.")
+            summarized_docs = [{'filename': d['filename'], 'summary': d['content'][:2000], 'full_content': d['content'][:10000]} for d in all_documents[:5]]
         
-        # STEP 2: Extract financial metrics with HuggingFace
+        # STEP 2: Extract financial metrics with HuggingFace (optional - skip if fails)
         print("Step 2: Extracting financial metrics with HuggingFace...")
-        financial_metrics = extract_financial_metrics_hf(all_documents[:3])
+        try:
+            financial_metrics = extract_financial_metrics_hf(all_documents[:3])
+        except Exception as e:
+            print(f"HuggingFace extraction failed: {e}. Skipping metrics.")
+            financial_metrics = {}
         
-        # STEP 3: Generate report
+        # STEP 3: Generate report (CRITICAL)
         print("Step 3: Generating report with OpenRouter...")
-        report = generate_report_openrouter(
-            summarized_docs,
-            financial_metrics,
-            dd_type,
-            report_focus,
-            checklist_type,
-            uploaded_files
-        )
+        try:
+            report = generate_report_openrouter(
+                summarized_docs,
+                financial_metrics,
+                dd_type,
+                report_focus,
+                checklist_type,
+                uploaded_files
+            )
+        except Exception as e:
+            print(f"Report generation failed: {e}")
+            return jsonify({'error': f'Report generation failed: {str(e)}'}), 500
         
-        if time.time() - start_time > 100:
-            print("Warning: Processing taking longer than expected")
+        if not report or "Error:" in report:
+            return jsonify({'error': report or 'Failed to generate report'}), 500
         
         # STEP 4: Generate charts
         print("Step 4: Generating charts and visualizations...")
-        extracted_data = extract_financial_data_from_report(report)
-        charts_html = generate_visual_report(report, extracted_data)
+        try:
+            extracted_data = extract_financial_data_from_report(report)
+            charts_html = generate_visual_report(report, extracted_data)
+        except Exception as e:
+            print(f"Chart generation failed: {e}. Proceeding without charts.")
+            charts_html = ""
         
         print(f"✓ Complete! Total time: {time.time() - start_time:.2f}s")
         
@@ -214,6 +238,7 @@ def summarize_documents_cohere(documents):
                     'full_content': doc['content'][:10000]
                 })
                 print(f"  ✓ Summarized {doc['filename']}")
+                time.sleep(0.5)  # Rate limiting
             except Exception as e:
                 print(f"  ✗ Cohere failed for {doc['filename']}: {e}")
                 summarized.append({
@@ -253,6 +278,7 @@ def extract_financial_metrics_hf(documents):
                     result = response.json()
                     metrics[doc['filename']] = result
                     print(f"  ✓ Extracted metrics from {doc['filename']}")
+                time.sleep(0.5)  # Rate limiting
             except Exception as e:
                 print(f"  ✗ HF extraction failed for {doc['filename']}: {e}")
                 continue
@@ -283,8 +309,9 @@ def generate_report_openrouter(documents, metrics, dd_type, report_focus, checkl
     
     # Try OpenRouter models in order
     free_models = [
-        "meta-llama/llama-3.1-70b-instruct",
-        "google/gemini-pro-1.5",
+        "meta-llama/llama-3.1-405b-instruct:free",
+        "meta-llama/llama-3.1-70b-instruct:free",
+        "google/gemini-pro-1.5-exp",
         "meta-llama/llama-3.1-8b-instruct:free",
         "google/gemma-2-9b-it:free",
         "microsoft/phi-3-mini-128k-instruct:free"
@@ -309,21 +336,24 @@ def generate_report_openrouter(documents, metrics, dd_type, report_focus, checkl
                     "max_tokens": 5000,
                     "temperature": 0.5
                 },
-                timeout=60
+                timeout=90
             )
             
             if response.status_code == 200:
                 result = response.json()
-                content = result['choices'][0]['message']['content']
-                print(f"  ✓ Success with {model}")
-                return f"[Generated using OPENROUTER: {model}]\n\n{content}"
+                if 'choices' in result and len(result['choices']) > 0:
+                    content = result['choices'][0]['message']['content']
+                    print(f"  ✓ Success with {model}")
+                    return f"[Generated using OPENROUTER: {model}]\n\n{content}"
+                else:
+                    print(f"  ✗ {model} returned empty response")
             else:
-                print(f"  ✗ {model} returned {response.status_code}")
+                print(f"  ✗ {model} returned {response.status_code}: {response.text[:200]}")
         except Exception as e:
             print(f"  ✗ {model} failed: {e}")
             continue
     
-    return "Error: All AI models failed to generate report. Please check your OpenRouter API key and try with fewer documents."
+    return "Error: All AI models failed to generate report. Please check your OpenRouter API key and credits at https://openrouter.ai/credits"
 
 def create_analysis_prompt(content, dd_type, report_focus, checklist_type, uploaded_files):
     """Create standardized prompt for analysis"""
