@@ -1,244 +1,235 @@
-from flask import Flask, render_template, request, jsonify, send_file
+from flask import Flask, request, jsonify, render_template
 import os
+import requests
+import json
+from datetime import datetime
 import PyPDF2
-from io import BytesIO
-import zipfile
-from chart_generator import generate_visual_report, extract_financial_data_from_report
-from reportlab.lib.pagesizes import letter
-from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.lib.units import inch
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, PageBreak
-from reportlab.lib.enums import TA_CENTER, TA_LEFT
+import io
 
 app = Flask(__name__)
 
-# Configuration
-MAX_PAGES_PER_PDF = 15
-MAX_CONTENT_PER_FILE = 20000
+# OpenRouter Configuration
+OPENROUTER_API_KEY = os.getenv('OPENROUTER_API_KEY', 'your_openrouter_api_key_here')
+OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions"
+DEEPSEEK_R1_MODEL = "deepseek/deepseek-r1"
 
-print("=" * 60)
-print("INITIALIZING SEGGY ANALYST (Puter.js Version)")
-print("✓ Backend running - AI processing moved to frontend")
-print("=" * 60)
-
-@app.route('/')
-def home():
-    return render_template('index.html')
-
-@app.route('/extract-text', methods=['POST'])
-def extract_text():
-    """Extract text from files for frontend AI processing"""
-    try:
-        files = request.files.getlist('files')
-        
-        if not files or len(files) == 0:
-            return jsonify({'error': 'No files uploaded'}), 400
-        
-        all_documents, uploaded_files = extract_all_files(files)
-        
-        if not all_documents:
-            return jsonify({'error': 'Could not extract text from any files.'}), 400
-        
-        print(f"✓ Extracted text from {len(all_documents)} documents")
-        
-        return jsonify({
-            'documents': all_documents,
-            'uploaded_files': uploaded_files,
-            'total_files': len(uploaded_files)
-        })
-    
-    except Exception as e:
-        print(f"❌ Text extraction error: {str(e)}")
-        return jsonify({'error': f'Text extraction failed: {str(e)}'}), 500
-
-@app.route('/generate-charts', methods=['POST'])
-def generate_charts():
-    """Generate charts from report text"""
-    try:
-        data = request.get_json()
-        report_text = data.get('report', '')
-        
-        if not report_text:
-            return jsonify({'error': 'No report content provided'}), 400
-        
-        extracted_data = extract_financial_data_from_report(report_text)
-        charts_html = generate_visual_report(report_text, extracted_data)
-        
-        return jsonify({
-            'charts': charts_html,
-            'success': True
-        })
-        
-    except Exception as e:
-        print(f"Chart generation error: {e}")
-        return jsonify({'error': f'Chart generation failed: {str(e)}'}), 500
-
-@app.route('/download-pdf', methods=['POST'])
-def download_pdf():
-    """Generate and download PDF report"""
-    try:
-        data = request.get_json()
-        report_text = data.get('report', '')
-        
-        if not report_text:
-            return jsonify({'error': 'No report content provided'}), 400
-        
-        # Create PDF
-        pdf_buffer = BytesIO()
-        doc = SimpleDocTemplate(pdf_buffer, pagesize=letter, 
-                               rightMargin=72, leftMargin=72,
-                               topMargin=72, bottomMargin=18)
-        
-        story = []
-        styles = getSampleStyleSheet()
-        
-        # Custom styles
-        title_style = ParagraphStyle(
-            'CustomTitle',
-            parent=styles['Heading1'],
-            fontSize=24,
-            textColor='#2c3e50',
-            spaceAfter=30,
-            alignment=TA_CENTER
-        )
-        
-        heading_style = ParagraphStyle(
-            'CustomHeading',
-            parent=styles['Heading2'],
-            fontSize=16,
-            textColor='#34495e',
-            spaceAfter=12,
-            spaceBefore=12
-        )
-        
-        body_style = ParagraphStyle(
-            'CustomBody',
-            parent=styles['BodyText'],
-            fontSize=11,
-            leading=16,
-            spaceAfter=12
-        )
-        
-        # Parse report text
-        lines = report_text.split('\n')
-        
-        for line in lines:
-            line = line.strip()
-            if not line:
-                story.append(Spacer(1, 0.2*inch))
-                continue
-            
-            # Detect headers
-            if line.startswith('# '):
-                text = line[2:].strip()
-                story.append(Paragraph(text, title_style))
-            elif line.startswith('## '):
-                text = line[3:].strip()
-                story.append(Paragraph(text, heading_style))
-            elif line.startswith('==='):
-                story.append(Spacer(1, 0.1*inch))
-            else:
-                # Regular text
-                # Escape XML special characters
-                text = line.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
-                story.append(Paragraph(text, body_style))
-        
-        # Build PDF
-        doc.build(story)
-        pdf_buffer.seek(0)
-        
-        return send_file(
-            pdf_buffer,
-            mimetype='application/pdf',
-            as_attachment=True,
-            download_name='Due_Diligence_Report.pdf'
-        )
-    
-    except Exception as e:
-        print(f"PDF generation error: {e}")
-        import traceback
-        traceback.print_exc()
-        return jsonify({'error': f'PDF generation failed: {str(e)}'}), 500
-
-def extract_all_files(files):
-    """Extract text from all uploaded files"""
-    all_documents = []
-    uploaded_files = []
-    
-    for file in files:
-        if file.filename == '':
-            continue
-        
-        if file.filename.lower().endswith('.zip'):
-            extracted_files = extract_zip_file(file)
-            for extracted_name, extracted_content in extracted_files:
-                uploaded_files.append(extracted_name)
-                if extracted_content:
-                    all_documents.append({
-                        'filename': extracted_name,
-                        'content': extracted_content[:MAX_CONTENT_PER_FILE]
-                    })
-        else:
-            filename = file.filename
-            uploaded_files.append(filename)
-            
-            pdf_text = extract_pdf_text(file)
-            if pdf_text:
-                all_documents.append({
-                    'filename': filename,
-                    'content': pdf_text[:MAX_CONTENT_PER_FILE]
-                })
-    
-    return all_documents, uploaded_files
-
-def extract_zip_file(zip_file):
-    """Extract PDF files from ZIP archive"""
-    extracted_files = []
-    try:
-        zip_bytes = zip_file.read()
-        with zipfile.ZipFile(BytesIO(zip_bytes)) as zip_ref:
-            for file_info in zip_ref.filelist:
-                if file_info.is_dir() or not file_info.filename.lower().endswith('.pdf'):
-                    continue
-                try:
-                    pdf_bytes = zip_ref.read(file_info)
-                    pdf_text = extract_pdf_from_bytes(pdf_bytes)
-                    clean_filename = os.path.basename(file_info.filename)
-                    extracted_files.append((clean_filename, pdf_text))
-                except Exception as e:
-                    print(f"Error extracting {file_info.filename}: {e}")
-        return extracted_files
-    except Exception as e:
-        print(f"ZIP processing error: {e}")
-        return []
-
-def extract_pdf_from_bytes(pdf_bytes):
-    """Extract text from PDF bytes"""
-    try:
-        pdf_reader = PyPDF2.PdfReader(BytesIO(pdf_bytes))
-        text = ""
-        page_count = min(MAX_PAGES_PER_PDF, len(pdf_reader.pages))
-        
-        for page_num in range(page_count):
-            page = pdf_reader.pages[page_num]
-            text += page.extract_text() + "\n"
-            if len(text) > 30000:
-                break
-        
-        return text.strip()
-    except Exception as e:
-        print(f"PDF extraction error: {e}")
-        return None
-
-def extract_pdf_text(file):
+def extract_text_from_pdf(file):
     """Extract text from PDF file"""
     try:
-        file_bytes = file.read()
-        return extract_pdf_from_bytes(file_bytes)
+        pdf_reader = PyPDF2.PdfReader(io.BytesIO(file.read()))
+        text = ""
+        for page in pdf_reader.pages:
+            text += page.extract_text() + "\n"
+        return text.strip()
     except Exception as e:
-        print(f"File read error: {e}")
+        print(f"Error extracting text from PDF: {e}")
         return None
 
+def analyze_financial_data_with_deepseek(extracted_text):
+    """
+    Analyze financial data using Deepseek R1 via OpenRouter
+    """
+    headers = {
+        "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+        "Content-Type": "application/json",
+        "HTTP-Referer": "https://your-financial-app.com",
+        "X-Title": "Financial Due Diligence Tool"
+    }
+    
+    prompt = f"""
+    You are a financial analyst. Analyze the following financial documents and provide a comprehensive due diligence report:
+    
+    {extracted_text}
+    
+    Please provide a structured analysis covering:
+    
+    1. FINANCIAL HEALTH ASSESSMENT:
+       - Revenue trends and growth patterns
+       - Profitability analysis
+       - Liquidity position
+       - Solvency and leverage
+    
+    2. KEY FINANCIAL RATIOS:
+       - Profitability ratios (Gross Margin, Net Margin, ROE, ROA)
+       - Liquidity ratios (Current Ratio, Quick Ratio)
+       - Efficiency ratios (Asset Turnover, Inventory Turnover)
+       - Leverage ratios (Debt-to-Equity, Debt-to-Assets)
+    
+    3. TREND ANALYSIS:
+       - Year-over-year performance changes
+       - Key trends and patterns
+       - Seasonal variations if any
+    
+    4. STRENGTHS AND CONCERNS:
+       - Major strengths in financial performance
+       - Potential red flags or concerns
+       - Areas requiring immediate attention
+    
+    5. RECOMMENDATIONS:
+       - Strategic recommendations
+       - Risk mitigation suggestions
+       - Opportunities for improvement
+    
+    Format the response in a clear, professional manner suitable for a due diligence report.
+    """
+    
+    payload = {
+        "model": DEEPSEEK_R1_MODEL,
+        "messages": [
+            {
+                "role": "user",
+                "content": prompt
+            }
+        ],
+        "max_tokens": 4000,
+        "temperature": 0.1
+    }
+    
+    try:
+        print("Sending request to Deepseek R1 via OpenRouter...")
+        response = requests.post(OPENROUTER_API_URL, headers=headers, json=payload, timeout=120)
+        response.raise_for_status()
+        
+        result = response.json()
+        return result['choices'][0]['message']['content']
+        
+    except requests.exceptions.Timeout:
+        print("OpenRouter API timeout")
+        return None
+    except requests.exceptions.RequestException as e:
+        print(f"OpenRouter API error: {e}")
+        return None
+    except KeyError as e:
+        print(f"Unexpected response format: {e}")
+        return None
+    except Exception as e:
+        print(f"Unexpected error: {e}")
+        return None
+
+def generate_fallback_report(extracted_texts, file_names):
+    """Generate fallback report when AI service is unavailable"""
+    total_chars = sum(len(text) for text in extracted_texts.values())
+    
+    report = {
+        "status": "fallback",
+        "report_content": f"""
+FINANCIAL DUE DILIGENCE REPORT (FALLBACK ANALYSIS)
+
+Total Files Analyzed: {len(file_names)}
+
+Note: Using fallback analysis - AI service unavailable
+
+DOCUMENTS PROCESSED:
+{chr(10).join(f'- {name}' for name in file_names)}
+
+TEXT EXTRACTION SUMMARY:
+- Successfully extracted text from {len(file_names)} documents
+- Total characters processed: {total_chars}
+- Documents contain financial data ready for analysis
+
+NEXT STEPS:
+1. The system successfully processed all uploaded documents
+2. AI analysis service is currently unavailable
+3. Please try again later or contact support
+
+For immediate assistance:
+- Ensure you have a stable internet connection
+- Refresh the page and try again
+- Try with fewer documents if the issue persists
+
+Document processing completed at: {datetime.now().strftime('%m/%d/%Y, %I:%M:%S %p')}
+""",
+        "files_processed": file_names,
+        "characters_processed": total_chars,
+        "timestamp": datetime.now().isoformat()
+    }
+    
+    return report
+
+def generate_full_report(ai_analysis, extracted_texts, file_names):
+    """Generate full report with AI analysis"""
+    total_chars = sum(len(text) for text in extracted_texts.values())
+    
+    report = {
+        "status": "success",
+        "report_content": f"""
+FINANCIAL DUE DILIGENCE REPORT
+
+Total Files Analyzed: {len(file_names)}
+Analysis Generated: {datetime.now().strftime('%m/%d/%Y, %I:%M:%S %p')}
+
+DOCUMENTS PROCESSED:
+{chr(10).join(f'- {name}' for name in file_names)}
+
+TEXT EXTRACTION SUMMARY:
+- Successfully extracted text from {len(file_names)} documents
+- Total characters processed: {total_chars}
+
+AI ANALYSIS RESULTS:
+{ai_analysis}
+
+---
+Report generated using Deepseek R1 via OpenRouter
+""",
+        "files_processed": file_names,
+        "characters_processed": total_chars,
+        "timestamp": datetime.now().isoformat()
+    }
+    
+    return report
+
+@app.route('/')
+def index():
+    return render_template('index.html')
+
+@app.route('/analyze', methods=['POST'])
+def analyze_documents():
+    try:
+        if 'files' not in request.files:
+            return jsonify({'error': 'No files uploaded'}), 400
+        
+        files = request.files.getlist('files')
+        if not files or all(file.filename == '' for file in files):
+            return jsonify({'error': 'No files selected'}), 400
+        
+        extracted_texts = {}
+        file_names = []
+        
+        # Extract text from all uploaded files
+        for file in files:
+            if file and file.filename.endswith('.pdf'):
+                text = extract_text_from_pdf(file)
+                if text:
+                    extracted_texts[file.filename] = text
+                    file_names.append(file.filename)
+                else:
+                    return jsonify({'error': f'Failed to extract text from {file.filename}'}), 400
+        
+        if not extracted_texts:
+            return jsonify({'error': 'No valid text extracted from uploaded files'}), 400
+        
+        # Combine all extracted text for analysis
+        combined_text = "\n\n".join([f"--- {name} ---\n{text}" for name, text in extracted_texts.items()])
+        
+        # Try AI analysis first
+        print("Attempting AI analysis with Deepseek R1...")
+        ai_analysis = analyze_financial_data_with_deepseek(combined_text)
+        
+        if ai_analysis:
+            report = generate_full_report(ai_analysis, extracted_texts, file_names)
+        else:
+            print("AI analysis failed, generating fallback report")
+            report = generate_fallback_report(extracted_texts, file_names)
+        
+        return jsonify(report)
+        
+    except Exception as e:
+        print(f"Error in analyze_documents: {e}")
+        return jsonify({'error': 'Internal server error'}), 500
+
+@app.route('/health')
+def health_check():
+    return jsonify({'status': 'healthy', 'timestamp': datetime.now().isoformat()})
+
 if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 10000))
-    app.run(host='0.0.0.0', port=port, debug=False)
+    app.run(host='0.0.0.0', port=5000, debug=True)
