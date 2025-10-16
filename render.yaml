@@ -1,0 +1,10 @@
+services:
+  - type: web
+    name: financial-due-diligence
+    env: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app:app
+    envVars:
+      - key: OPENROUTER_API_KEY
+        value: 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
