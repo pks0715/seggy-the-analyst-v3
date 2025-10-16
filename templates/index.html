@@ -1073,13 +1073,12 @@
             const chartsHTML = document.getElementById('chartsContainer').innerHTML;
             const reportText = document.getElementById('reportContent').textContent;
             
-            const fullHTML = `
-<!DOCTYPE html>
+            const fullHTML = `<!DOCTYPE html>
 <html>
 <head>
     <meta charset="UTF-8">
     <title>Due Diligence Report</title>
-    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"><\/script>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -1119,8 +1118,7 @@
         ${reportText}
     </div>
 </body>
-</html>
-            `;
+</html>`;
             
             const blob = new Blob([fullHTML], { type: 'text/html' });
             const url = window.URL.createObjectURL(blob);
