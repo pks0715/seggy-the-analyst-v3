@@ -42,6 +42,10 @@ huggingface_key = os.environ.get('HUGGINGFACE_API_KEY')
 if huggingface_key:
     print("✓ HuggingFace key available")
 
+openai_key = os.environ.get('OPENAI_API_KEY')
+if openai_key:
+    print("✓ OpenAi key available")
+
 print("API initialization complete\n")
 
 @app.route('/')
