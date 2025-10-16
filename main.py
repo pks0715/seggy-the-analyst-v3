@@ -24,27 +24,56 @@ print("=" * 60)
 print("INITIALIZING SEGGY ANALYST")
 print("=" * 60)
 
-# Debug: Print all environment variables (without values for security)
-print("Environment variables found:")
-for key in os.environ:
-    if 'API' in key or 'KEY' in key:
-        print(f"  {key}: {'*' * len(os.environ[key])}")  # Mask the actual key
+# Try multiple possible environment variable names for OpenAI key
+possible_keys = ['OPENAI_API_KEY', 'OPENAI_KEY', 'OPENAI_API_KEY', 'API_KEY']
+openai_key = None
+
+for key_name in possible_keys:
+    key_value = os.environ.get(key_name)
+    if key_value:
+        print(f"✓ Found OpenAI key in environment variable: {key_name}")
+        openai_key = key_value
+        break
+
+if not openai_key:
+    print("✗ No OpenAI API key found in any environment variable")
+    print("Available environment variables:")
+    for key, value in os.environ.items():
+        if 'key' in key.lower() or 'api' in key.lower():
+            print(f"  {key}: {'*' * min(10, len(value))}...")  # Show first 10 chars masked
+else:
+    print(f"✓ OpenAI key found (starts with): {openai_key[:10]}...")
+    
+    # Validate the key format
+    if openai_key.startswith('sk-'):
+        print("✓ Key format appears valid (starts with 'sk-')")
+    else:
+        print("⚠️  Key format may be invalid (should start with 'sk-')")
 
 # Initialize OpenAI client
-openai_key = os.environ.get('OPENAI_API_KEY')
-print(f"OpenAI API Key present: {'YES' if openai_key else 'NO'}")
-
+openai_client = None
 if openai_key:
     try:
         openai_client = OpenAI(api_key=openai_key)
-        # Test the client with a simple call to verify it works
         print("✓ OpenAI client initialized successfully")
+        
+        # Test the API key with a simple, cheap call
+        try:
+            test_response = openai_client.chat.completions.create(
+                model="gpt-3.5-turbo",
+                messages=[{"role": "user", "content": "Say 'API test successful'"}],
+                max_tokens=5
+            )
+            print("✓ OpenAI API test successful - key is valid")
+        except Exception as test_error:
+            print(f"✗ OpenAI API test failed: {test_error}")
+            openai_client = None
+            
     except Exception as e:
         print(f"✗ OpenAI client initialization failed: {e}")
         openai_client = None
 else:
-    print("✗ OpenAI API key missing from environment variables")
-    openai_client = None
+    print("✗ Cannot initialize OpenAI client - no API key available")
 
 print("Initialization complete\n")
 
@@ -58,9 +87,23 @@ def analyze():
         start_time = time.time()
         
         if not openai_client:
-            error_msg = "OpenAI API key not configured. Please check your environment variables."
-            print(f"❌ {error_msg}")
-            return jsonify({'error': error_msg}), 500
+            error_details = """
+            OpenAI API configuration error:
+            
+            Possible issues:
+            1. OPENAI_API_KEY environment variable not set in Render
+            2. API key format is invalid
+            3. No credits in OpenAI account
+            4. API key is revoked or expired
+            
+            Solution:
+            - Go to Render dashboard → Your service → Environment
+            - Add: OPENAI_API_KEY = your_actual_openai_api_key
+            - Make sure key starts with 'sk-'
+            - Verify you have credits at https://platform.openai.com
+            """
+            print(error_details)
+            return jsonify({'error': 'OpenAI API key not configured. Please check your environment variables in Render dashboard.'}), 500
         
         dd_type = request.form.get('dd_type', 'M&A Due Diligence')
         report_focus = request.form.get('report_focus', 'Financial Report')
@@ -157,6 +200,7 @@ def analyze():
         traceback.print_exc()
         return jsonify({'error': f'An error occurred: {str(e)}'}), 500
 
+# ... (keep all the other functions the same as previous version - download_pdf, extract_all_files, create_batches, process_batch, synthesize_reports, call_openai, has_actual_content, create_batch_prompt, create_synthesis_prompt, extract_zip_file, extract_pdf_from_bytes, extract_pdf_text)
 
 @app.route('/download-pdf', methods=['POST'])
 def download_pdf():
