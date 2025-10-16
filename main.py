@@ -26,8 +26,11 @@ print("Initializing OpenAI client...")
 openai_client = None
 openai_key = os.environ.get('OPENAI_API_KEY')
 if openai_key:
-    openai_client = OpenAI(api_key=openai_key)
-    print("✓ OpenAI initialized")
+    try:
+        openai_client = OpenAI(api_key=openai_key)
+        print("✓ OpenAI initialized")
+    except Exception as e:
+        print(f"✗ OpenAI initialization failed: {e}")
 else:
     print("✗ OpenAI API key missing - REQUIRED")
 
@@ -348,7 +351,7 @@ def call_openai(prompt, max_tokens=4000):
         print(f"  🤖 Calling OpenAI API...")
         
         response = openai_client.chat.completions.create(
-            model="gpt-4",  # Use gpt-4 for better analysis
+            model="gpt-3.5-turbo",  # Using gpt-3.5-turbo for cost efficiency
             messages=[
                 {
                     "role": "system", 
@@ -371,8 +374,7 @@ Your analysis should be data-driven, specific, and actionable."""
                 }
             ],
             max_tokens=max_tokens,
-            temperature=0.1,  # Low temperature for factual output
-            top_p=0.9
+            temperature=0.1  # Low temperature for factual output
         )
         
         content = response.choices[0].message.content
