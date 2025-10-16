@@ -4,8 +4,7 @@ import PyPDF2
 from io import BytesIO
 import zipfile
 import time
-import cohere
-import requests
+from openai import OpenAI
 from chart_generator import generate_visual_report, extract_financial_data_from_report
 from reportlab.lib.pagesizes import letter
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
@@ -21,26 +20,16 @@ BATCH_SIZE = 5
 MAX_PAGES_PER_PDF = 15
 MAX_CONTENT_PER_FILE = 20000
 
-print("Initializing API clients...")
+print("Initializing OpenAI client...")
 
-cohere_client = None
-try:
-    cohere_api_key = os.environ.get('COHERE_API_KEY')
-    if cohere_api_key:
-        cohere_client = cohere.ClientV2(api_key=cohere_api_key)
-        print("✓ Cohere initialized")
-except Exception as e:
-    print(f"✗ Cohere failed: {e}")
-
-openrouter_key = os.environ.get('OPENROUTER_API_KEY')
-if openrouter_key:
-    print("✓ OpenRouter key available")
+# Initialize OpenAI client
+openai_client = None
+openai_key = os.environ.get('OPENAI_API_KEY')
+if openai_key:
+    openai_client = OpenAI(api_key=openai_key)
+    print("✓ OpenAI initialized")
 else:
-    print("✗ OpenRouter key missing - REQUIRED")
-
-huggingface_key = os.environ.get('HUGGINGFACE_API_KEY')
-if huggingface_key:
-    print("✓ HuggingFace key available")
+    print("✗ OpenAI API key missing - REQUIRED")
 
 print("API initialization complete\n")
 
@@ -53,8 +42,8 @@ def analyze():
     try:
         start_time = time.time()
         
-        if not openrouter_key:
-            return jsonify({'error': 'OpenRouter API key not configured.'}), 500
+        if not openai_client:
+            return jsonify({'error': 'OpenAI API key not configured.'}), 500
         
         dd_type = request.form.get('dd_type', 'M&A Due Diligence')
         report_focus = request.form.get('report_focus', 'Financial Report')
@@ -284,17 +273,17 @@ def create_batches(documents, batch_size):
 def process_batch(batch_docs, batch_num, total_batches, dd_type, report_focus):
     """Process a single batch of documents"""
     try:
-        # Prepare batch documents with MORE content
+        # Prepare batch documents
         batch_content = []
         for doc in batch_docs:
             batch_content.append({
                 'filename': doc['filename'],
-                'content': doc['content'][:15000]  # Increased content
+                'content': doc['content'][:15000]
             })
         
         prompt = create_batch_prompt(batch_content, batch_num, total_batches, dd_type, report_focus)
         
-        report = call_openrouter(prompt, max_tokens=4000, use_better_models=False)
+        report = call_openai(prompt, max_tokens=4000)
         
         return report
     
@@ -325,7 +314,7 @@ def synthesize_reports(batch_reports, dd_type, report_focus, checklist_type, upl
         
         prompt = create_synthesis_prompt(synthesis_content, dd_type, report_focus, checklist_type, len(uploaded_files))
         
-        final_report = call_openrouter(prompt, max_tokens=6000, use_better_models=True)
+        final_report = call_openai(prompt, max_tokens=6000)
         
         header = f"""FINANCIAL DUE DILIGENCE REPORT
 {'='*70}
@@ -353,107 +342,53 @@ Report Type: {dd_type} - {report_focus}
         return combined
 
 
-def call_openrouter(prompt, max_tokens=3000, use_better_models=False):
-    """Make API call to OpenRouter with improved model selection and better error handling"""
-    
-    if use_better_models:
-        # Use better models for synthesis
-        models = [
-            "meta-llama/llama-3.1-70b-instruct:free",
-            "google/gemini-pro-1.5-exp",
-            "anthropic/claude-3.5-sonnet:free",
-            "meta-llama/llama-3.1-8b-instruct:free",
-        ]
-    else:
-        # Faster models for batch processing
-        models = [
-            "meta-llama/llama-3.1-8b-instruct:free",
-            "google/gemma-2-9b-it:free",
-            "microsoft/phi-3-mini-128k-instruct:free",
-        ]
-    
-    for model in models:
-        try:
-            print(f"  🤖 Trying model: {model}")
-            
-            response = requests.post(
-                url="https://openrouter.ai/api/v1/chat/completions",
-                headers={
-                    "Authorization": f"Bearer {openrouter_key}",
-                    "HTTP-Referer": "https://seggy-analyst.onrender.com",
-                    "X-Title": "Seggy Analyst"
-                },
-                json={
-                    "model": model,
-                    "messages": [
-                        {
-                            "role": "system", 
-                            "content": """CRITICAL: You are a senior M&A financial analyst. You MUST:
+def call_openai(prompt, max_tokens=4000):
+    """Make API call to OpenAI"""
+    try:
+        print(f"  🤖 Calling OpenAI API...")
+        
+        response = openai_client.chat.completions.create(
+            model="gpt-4",  # Use gpt-4 for better analysis
+            messages=[
+                {
+                    "role": "system", 
+                    "content": """You are a senior M&A financial analyst with 20+ years of experience at top investment banks. 
+
+CRITICAL INSTRUCTIONS:
 1. Extract ACTUAL numbers, dates, and facts from the provided documents
 2. NEVER provide templates, frameworks, or placeholder text
 3. If data is missing, state what's missing but still analyze what's available
 4. Use specific dollar amounts, percentages, and dates from the documents
 5. Reference which documents contained which data
 6. Provide concrete recommendations based on actual data found
+7. Always ground your analysis in the specific numbers extracted
 
-FAILURE TO EXTRACT REAL DATA WILL RESULT IN POOR PERFORMANCE."""
-                        },
-                        {
-                            "role": "user", 
-                            "content": prompt
-                        }
-                    ],
-                    "max_tokens": max_tokens,
-                    "temperature": 0.1,  # Lower temperature for more factual output
-                    "top_p": 0.9
+Your analysis should be data-driven, specific, and actionable."""
                 },
-                timeout=90
-            )
+                {
+                    "role": "user", 
+                    "content": prompt
+                }
+            ],
+            max_tokens=max_tokens,
+            temperature=0.1,  # Low temperature for factual output
+            top_p=0.9
+        )
+        
+        content = response.choices[0].message.content
+        
+        # Validate content has actual data
+        if has_actual_content(content):
+            print(f"  ✅ OpenAI success - real data found")
+            return content
+        else:
+            print(f"  ⚠️  OpenAI returned generic content")
+            # Still return it but with a note
+            return content + "\n\n[Note: Limited specific data found in documents]"
             
-            if response.status_code == 200:
-                result = response.json()
-                if 'choices' in result and len(result['choices']) > 0:
-                    content = result['choices'][0]['message']['content']
-                    
-                    # STRICT template detection
-                    template_phrases = [
-                        "I can help you structure",
-                        "Once you provide", 
-                        "Here's a framework",
-                        "This is a great framework",
-                        "breakdown of how to approach",
-                        "You'll need to pull from",
-                        "incorporating the specific data",
-                        "placeholder for",
-                        "template for",
-                        "framework for"
-                    ]
-                    
-                    if any(phrase.lower() in content.lower() for phrase in template_phrases):
-                        print(f"  ⚠️  {model} returned template - REJECTED")
-                        continue
-                    
-                    # Check if content has actual numbers and analysis
-                    if has_actual_content(content):
-                        print(f"  ✅ {model} success - real data found")
-                        return content
-                    else:
-                        print(f"  ⚠️  {model} returned generic content - trying next")
-                        continue
-                        
-            elif response.status_code == 402:
-                print(f"  💳 {model} - Out of credits")
-                continue
-            else:
-                print(f"  ✗ {model} API error: {response.status_code}")
-                continue
-                
-        except Exception as e:
-            print(f"  ✗ {model} error: {str(e)[:100]}")
-            continue
-    
-    print("  ❌ All models failed - returning error")
-    return "ERROR: All AI models failed to provide actual analysis. Please try different documents or check API credits."
+    except Exception as e:
+        print(f"  ✗ OpenAI API error: {str(e)}")
+        return None
 
 
 def has_actual_content(text):
@@ -469,18 +404,11 @@ def has_actual_content(text):
     ]
     template_count = sum(1 for phrase in template_phrases if phrase in text.lower())
     
-    # Look for actual analysis indicators
-    analysis_indicators = [
-        "revenue", "profit", "margin", "cash", "debt", "assets", 
-        "liabilities", "growth", "decline", "increase", "decrease"
-    ]
-    analysis_count = sum(1 for word in analysis_indicators if word in text.lower())
-    
-    return numbers_found >= 3 and template_count == 0 and analysis_count >= 5
+    return numbers_found >= 2 and template_count == 0
 
 
 def create_batch_prompt(batch_docs, batch_num, total_batches, dd_type, report_focus):
-    """Create detailed prompt for analyzing a single batch - FIXED to prevent templates"""
+    """Create detailed prompt for analyzing a single batch"""
     
     files_content = ""
     for doc in batch_docs:
@@ -488,124 +416,99 @@ def create_batch_prompt(batch_docs, batch_num, total_batches, dd_type, report_fo
         files_content += doc['content'][:12000]
         files_content += "\n\n"
     
-    return f"""CRITICAL: You are analyzing ACTUAL financial documents. Extract REAL data. Do NOT provide templates.
+    return f"""ANALYZE THESE FINANCIAL DOCUMENTS FOR M&A DUE DILIGENCE:
 
 DOCUMENTS PROVIDED:
 {files_content}
 
-ANALYSIS REQUIREMENTS:
+EXTRACT AND ANALYZE ACTUAL FINANCIAL DATA:
 
-1. EXTRACT THESE ACTUAL NUMBERS FROM THE DOCUMENTS:
-   - Revenue figures with years/dates: [ACTUAL $ AMOUNTS]
-   - Profit margins: [ACTUAL %]
-   - Assets and liabilities: [ACTUAL $ AMOUNTS] 
-   - Cash flow numbers: [ACTUAL $ AMOUNTS]
-   - Debt levels: [ACTUAL $ AMOUNTS]
-   - Growth rates: [ACTUAL % CALCULATED FROM DATA]
-
-2. FOR EACH NUMBER, SPECIFY:
-   - Exact value found
-   - Time period (year/quarter)
-   - Which document it came from
-
-3. WRITE ANALYSIS USING ACTUAL DATA:
-
-REVENUE ANALYSIS:
-- What are the actual revenue numbers found? List them with dates.
+REVENUE & GROWTH:
+- What specific revenue numbers are mentioned? Include amounts, dates, and periods.
 - Calculate growth rates between periods using actual numbers.
-- Identify revenue trends based on actual data.
+- Identify revenue trends and patterns.
 
-PROFITABILITY:  
-- What gross/operating/net margins are stated? Use actual percentages.
-- What EBITDA numbers are present? Use actual amounts.
-- Analyze cost structure using actual expense numbers.
+PROFITABILITY:
+- What profit margins are stated? (gross, operating, net, EBITDA)
+- Extract actual percentages and amounts.
+- Analyze cost structure and major expenses.
 
 BALANCE SHEET:
-- List actual asset amounts found.
-- List actual liability amounts found. 
-- Calculate working capital using actual numbers.
-- Analyze debt levels using actual amounts.
+- What asset amounts are listed? (current assets, fixed assets, total assets)
+- What liability amounts are listed? (current liabilities, long-term debt, total liabilities)
+- Calculate key ratios: current ratio, debt-to-equity.
 
 CASH FLOW:
-- What operating cash flow numbers are present?
-- What investing/financing cash flow amounts are found?
-- Analyze cash position using actual numbers.
+- What cash flow numbers are present? (operating, investing, financing)
+- Analyze cash position and liquidity.
 
-KEY RISKS IDENTIFIED:
-Based on ACTUAL data found, list specific risks with:
-- Risk description tied to actual numbers
-- Severity based on financial impact
+KEY FINDINGS:
+List 5-7 specific findings with:
+- The actual data point or figure
+- Which document it came from  
+- Why it matters for due diligence
+
+RISKS IDENTIFIED:
+List 3-5 specific risks found in these documents with:
+- Description tied to actual data
+- Severity assessment
 - Source document
 
-IMMEDIATE FINDINGS:
-List 5-7 specific findings using ACTUAL numbers from the documents.
+DATA QUALITY ASSESSMENT:
+- What financial information is complete?
+- What key data is missing?
+- Any inconsistencies between documents?
 
-REMEMBER: 
-- If data is missing, say "Data not found in documents" but still analyze what's available.
-- NEVER use placeholders like [insert number] or [year].
-- Use ONLY the numbers and facts present in the documents above.
+IMPORTANT: 
+- Use ONLY numbers and facts from the documents above.
+- If data is not found, state "Not specified in documents".
 - Reference specific documents for each data point.
+- Be specific and data-driven in your analysis.
 """
 
 
 def create_synthesis_prompt(batch_reports_content, dd_type, report_focus, checklist_type, total_files):
-    """Create prompt for synthesizing all batch reports - FIXED to prevent templates"""
-    return f"""CRITICAL: Create a FINAL due diligence report using ONLY ACTUAL DATA from the batch analyses below. 
-NO TEMPLATES. NO FRAMEWORKS. Use only the real numbers and facts provided.
+    """Create prompt for synthesizing all batch reports"""
+    return f"""CREATE A COMPREHENSIVE M&A DUE DILIGENCE REPORT:
 
-BATCH ANALYSIS DATA:
+BATCH ANALYSIS RESULTS:
 {batch_reports_content}
 
-CREATE THE FINAL REPORT WITH THIS STRUCTURE:
+CREATE A PROFESSIONAL EXECUTIVE REPORT:
 
 # EXECUTIVE SUMMARY
-
-[3 paragraphs summarizing the ACTUAL financial situation using specific numbers found]
-
-Overall Financial Health: [Based on actual revenue, profit, cash flow numbers]
-Key Value Drivers: [Specific factors identified from actual data]
-Recommendation: [Go/No-Go based on actual findings]
+[3 paragraphs summarizing overall financial health, key value drivers, and preliminary recommendation based on ACTUAL data]
 
 ## Financial Performance Summary
-
-Revenue: [ACTUAL numbers with years and growth rates calculated]
-Profitability: [ACTUAL margin percentages and trends]
-Cash Flow: [ACTUAL cash flow numbers and analysis]
-Balance Sheet: [ACTUAL asset/liability amounts and ratios]
+- Revenue Analysis: [Specific numbers, growth rates, trends]
+- Profitability: [Actual margins, profit trends]  
+- Cash Flow & Liquidity: [Cash position, flow analysis]
+- Balance Sheet Strength: [Asset quality, debt levels, ratios]
 
 ## Key Financial Metrics
+[List 8-10 most important metrics with ACTUAL numbers and sources]
 
-- Revenue (Latest): $[ACTUAL AMOUNT] from [DOCUMENT]
-- Gross Margin: [ACTUAL %] from [DOCUMENT]  
-- Operating Margin: [ACTUAL %] from [DOCUMENT]
-- Net Income: $[ACTUAL AMOUNT] from [DOCUMENT]
-- Cash Position: $[ACTUAL AMOUNT] from [DOCUMENT]
-- Total Debt: $[ACTUAL AMOUNT] from [DOCUMENT]
-
-## Risk Assessment
-
-[Based on ACTUAL data found, list 5-8 specific risks with:
-- Risk description tied to actual numbers
-- Severity (High/Medium/Low)
-- Financial impact estimate
-- Source documents]
+## Comprehensive Risk Assessment
+[8-12 specific risks with severity, financial impact, and mitigation suggestions]
 
 ## Operational Analysis
+[Business model, customer concentration, supplier dependencies based on actual data]
 
-[Based on ACTUAL data found in documents]
+## Valuation Considerations
+[Value drivers, quality of earnings, comparable analysis]
 
-## Final Recommendation & Rationale
+## Final Recommendation
+[Clear Go/No-Go/Conditional Go with data-driven rationale]
 
-[Specific recommendation based on actual financial data]
-[3 key data points supporting the decision]
-[Required next steps based on missing data]
+## Required Additional Diligence
+[Specific items needing further investigation]
 
-CRITICAL REMINDERS:
-- Use ONLY numbers and facts from the batch reports above
-- NEVER use placeholders or templates
-- If data is inconsistent, note the inconsistencies
-- Reference which documents provided key data points
-- All analysis must be grounded in actual numbers found
+CRITICAL: 
+- Use ONLY the actual data from the batch reports above
+- Never use placeholders or templates
+- All analysis must be grounded in specific numbers found
+- Reference which batches/documents provided key data
+- Be specific, actionable, and professional
 """
 
 
