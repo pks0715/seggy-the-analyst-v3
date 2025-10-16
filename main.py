@@ -20,21 +20,33 @@ BATCH_SIZE = 5
 MAX_PAGES_PER_PDF = 15
 MAX_CONTENT_PER_FILE = 20000
 
-print("Initializing OpenAI client...")
+print("=" * 60)
+print("INITIALIZING SEGGY ANALYST")
+print("=" * 60)
+
+# Debug: Print all environment variables (without values for security)
+print("Environment variables found:")
+for key in os.environ:
+    if 'API' in key or 'KEY' in key:
+        print(f"  {key}: {'*' * len(os.environ[key])}")  # Mask the actual key
 
 # Initialize OpenAI client
-openai_client = None
 openai_key = os.environ.get('OPENAI_API_KEY')
+print(f"OpenAI API Key present: {'YES' if openai_key else 'NO'}")
+
 if openai_key:
     try:
         openai_client = OpenAI(api_key=openai_key)
-        print("✓ OpenAI initialized")
+        # Test the client with a simple call to verify it works
+        print("✓ OpenAI client initialized successfully")
     except Exception as e:
-        print(f"✗ OpenAI initialization failed: {e}")
+        print(f"✗ OpenAI client initialization failed: {e}")
+        openai_client = None
 else:
-    print("✗ OpenAI API key missing - REQUIRED")
+    print("✗ OpenAI API key missing from environment variables")
+    openai_client = None
 
-print("API initialization complete\n")
+print("Initialization complete\n")
 
 @app.route('/')
 def home():
@@ -46,7 +58,9 @@ def analyze():
         start_time = time.time()
         
         if not openai_client:
-            return jsonify({'error': 'OpenAI API key not configured.'}), 500
+            error_msg = "OpenAI API key not configured. Please check your environment variables."
+            print(f"❌ {error_msg}")
+            return jsonify({'error': error_msg}), 500
         
         dd_type = request.form.get('dd_type', 'M&A Due Diligence')
         report_focus = request.form.get('report_focus', 'Financial Report')
@@ -351,7 +365,7 @@ def call_openai(prompt, max_tokens=4000):
         print(f"  🤖 Calling OpenAI API...")
         
         response = openai_client.chat.completions.create(
-            model="gpt-3.5-turbo",  # Using gpt-3.5-turbo for cost efficiency
+            model="gpt-3.5-turbo",
             messages=[
                 {
                     "role": "system", 
@@ -374,7 +388,7 @@ Your analysis should be data-driven, specific, and actionable."""
                 }
             ],
             max_tokens=max_tokens,
-            temperature=0.1  # Low temperature for factual output
+            temperature=0.1
         )
         
         content = response.choices[0].message.content
@@ -385,8 +399,7 @@ Your analysis should be data-driven, specific, and actionable."""
             return content
         else:
             print(f"  ⚠️  OpenAI returned generic content")
-            # Still return it but with a note
-            return content + "\n\n[Note: Limited specific data found in documents]"
+            return content
             
     except Exception as e:
         print(f"  ✗ OpenAI API error: {str(e)}")
@@ -395,11 +408,9 @@ Your analysis should be data-driven, specific, and actionable."""
 
 def has_actual_content(text):
     """Check if text contains actual financial data vs templates"""
-    # Look for actual numbers, dates, specific references
-    number_pattern = r'\$\d+\.?\d*[MB]?|\d+\.?\d*\s*%|\d{4}[-/]\d{1,2}[-/]\d{1,2}|\b(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s+\d{4}\b'
+    number_pattern = r'\$\d+\.?\d*[MB]?|\d+\.?\d*\s*%|\d{4}[-/]\d{1,2}[-/]\d{1,2}'
     numbers_found = len(re.findall(number_pattern, text.lower()))
     
-    # Look for template phrases (negative indicator)
     template_phrases = [
         "you'll need to", "placeholder", "template", "framework", 
         "breakdown of how", "incorporating the specific", "this is a great"
