@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Seggy the Analyst - AI Due Diligence</title>
+    <!-- Add Puter.js -->
+    <script src="https://js.puter.com/v2/"></script>
     <style>
         * {
             margin: 0;
@@ -894,6 +896,193 @@
     <input type="file" id="specificFileInput" accept=".pdf" style="display: none;">
     <input type="file" id="yearFileInput" accept=".pdf" style="display: none;">
 
+    <!-- Puter AI Integration -->
+    <script>
+        // Puter AI Client
+        class PuterAIClient {
+            constructor() {
+                this.isInitialized = false;
+                this.initialize();
+            }
+
+            initialize() {
+                if (typeof puter !== 'undefined') {
+                    this.isInitialized = true;
+                    console.log("✓ Puter.js initialized successfully");
+                } else {
+                    console.error("✗ Puter.js not loaded");
+                }
+            }
+
+            async analyzeBatch(batchContent, batchNum, totalBatches, ddType, reportFocus) {
+                if (!this.isInitialized) {
+                    throw new Error("Puter.js not initialized");
+                }
+
+                const prompt = this.createBatchPrompt(batchContent, batchNum, totalBatches, ddType, reportFocus);
+                
+                try {
+                    const response = await puter.ai.chat(prompt, {
+                        model: "gpt-4o",
+                        temperature: 0.1,
+                        max_tokens: 4000
+                    });
+                    
+                    return this.validateResponse(response);
+                } catch (error) {
+                    console.error(`Batch ${batchNum} analysis failed:`, error);
+                    throw error;
+                }
+            }
+
+            async synthesizeReports(batchReportsContent, ddType, reportFocus, checklistType, totalFiles) {
+                if (!this.isInitialized) {
+                    throw new Error("Puter.js not initialized");
+                }
+
+                const prompt = this.createSynthesisPrompt(batchReportsContent, ddType, reportFocus, checklistType, totalFiles);
+                
+                try {
+                    const response = await puter.ai.chat(prompt, {
+                        model: "gpt-4o",
+                        temperature: 0.1,
+                        max_tokens: 6000
+                    });
+                    
+                    return this.validateResponse(response);
+                } catch (error) {
+                    console.error("Synthesis failed:", error);
+                    throw error;
+                }
+            }
+
+            createBatchPrompt(batchContent, batchNum, totalBatches, ddType, reportFocus) {
+                let filesContent = "";
+                batchContent.forEach(doc => {
+                    filesContent += `\n${'='.repeat(60)}\nFILE: ${doc.filename}\n${'='.repeat(60)}\n`;
+                    filesContent += doc.content.substring(0, 12000);
+                    filesContent += "\n\n";
+                });
+
+                return `ANALYZE THESE FINANCIAL DOCUMENTS FOR M&A DUE DILIGENCE (BATCH ${batchNum}/${totalBatches}):
+
+DOCUMENTS PROVIDED:
+${filesContent}
+
+EXTRACT AND ANALYZE ACTUAL FINANCIAL DATA:
+
+REVENUE & GROWTH:
+- What specific revenue numbers are mentioned? Include amounts, dates, and periods.
+- Calculate growth rates between periods using actual numbers.
+- Identify revenue trends and patterns.
+
+PROFITABILITY:
+- What profit margins are stated? (gross, operating, net, EBITDA)
+- Extract actual percentages and amounts.
+- Analyze cost structure and major expenses.
+
+BALANCE SHEET:
+- What asset amounts are listed? (current assets, fixed assets, total assets)
+- What liability amounts are listed? (current liabilities, long-term debt, total liabilities)
+- Calculate key ratios: current ratio, debt-to-equity.
+
+CASH FLOW:
+- What cash flow numbers are present? (operating, investing, financing)
+- Analyze cash position and liquidity.
+
+KEY FINDINGS:
+List 5-7 specific findings with:
+- The actual data point or figure
+- Which document it came from  
+- Why it matters for due diligence
+
+RISKS IDENTIFIED:
+List 3-5 specific risks found in these documents with:
+- Description tied to actual data
+- Severity assessment
+- Source document
+
+DATA QUALITY ASSESSMENT:
+- What financial information is complete?
+- What key data is missing?
+- Any inconsistencies between documents?
+
+IMPORTANT: 
+- Use ONLY numbers and facts from the documents above.
+- If data is not found, state "Not specified in documents".
+- Reference specific documents for each data point.
+- Be specific and data-driven in your analysis.`;
+            }
+
+            createSynthesisPrompt(batchReportsContent, ddType, reportFocus, checklistType, totalFiles) {
+                return `CREATE A COMPREHENSIVE M&A DUE DILIGENCE REPORT:
+
+BATCH ANALYSIS RESULTS:
+${batchReportsContent}
+
+CREATE A PROFESSIONAL EXECUTIVE REPORT:
+
+# EXECUTIVE SUMMARY
+[3 paragraphs summarizing overall financial health, key value drivers, and preliminary recommendation based on ACTUAL data]
+
+## Financial Performance Summary
+- Revenue Analysis: [Specific numbers, growth rates, trends]
+- Profitability: [Actual margins, profit trends]  
+- Cash Flow & Liquidity: [Cash position, flow analysis]
+- Balance Sheet Strength: [Asset quality, debt levels, ratios]
+
+## Key Financial Metrics
+[List 8-10 most important metrics with ACTUAL numbers and sources]
+
+## Comprehensive Risk Assessment
+[8-12 specific risks with severity, financial impact, and mitigation suggestions]
+
+## Operational Analysis
+[Business model, customer concentration, supplier dependencies based on actual data]
+
+## Valuation Considerations
+[Value drivers, quality of earnings, comparable analysis]
+
+## Final Recommendation
+[Clear Go/No-Go/Conditional Go with data-driven rationale]
+
+## Required Additional Diligence
+[Specific items needing further investigation]
+
+CRITICAL: 
+- Use ONLY the actual data from the batch reports above
+- Never use placeholders or templates
+- All analysis must be grounded in specific numbers found
+- Reference which batches/documents provided key data
+- Be specific, actionable, and professional`;
+            }
+
+            validateResponse(response) {
+                if (!response || typeof response !== 'string') {
+                    throw new Error("Invalid response from AI");
+                }
+
+                const templatePhrases = [
+                    "you'll need to", "placeholder", "template", "framework", 
+                    "breakdown of how", "incorporating the specific", "this is a great"
+                ];
+                
+                const hasTemplate = templatePhrases.some(phrase => 
+                    response.toLowerCase().includes(phrase)
+                );
+
+                if (hasTemplate) {
+                    throw new Error("AI returned template response instead of actual analysis");
+                }
+
+                return response;
+            }
+        }
+
+        // Create global instance
+        window.puterAIClient = new PuterAIClient();
+    </script>
+
     <script>
         let selectedChecklistType = 'Simple';
         let uploadedFiles = [];
@@ -1550,97 +1739,170 @@
                 analyzeBtn.style.display = 'none';
             }
         }
-        
+
+        // Updated Analyze Function with Puter.js
         analyzeBtn.addEventListener('click', async () => {
             if (uploadedFiles.length === 0) {
                 alert('Please upload at least one file');
                 return;
             }
-            
+
+            // Check if Puter.js is available
+            if (typeof puter === 'undefined' || !window.puterAIClient || !window.puterAIClient.isInitialized) {
+                alert('Error: AI service not loaded. Please refresh the page and try again.');
+                return;
+            }
+
             const batchSize = 5;
             const estimatedBatches = Math.ceil(uploadedFiles.length / batchSize);
-            const estimatedTime = estimatedBatches * 30;
-            
+            const estimatedTime = estimatedBatches * 45;
+
             loading.style.display = 'block';
             reportSection.style.display = 'none';
             errorDiv.style.display = 'none';
             analyzeBtn.disabled = true;
-            
-            const loadingMessages = document.querySelector('.loading');
-            const existingMsg = loadingMessages.querySelector('p:nth-child(2)');
-            
+
+            // Update loading message
+            const existingMsg = loading.querySelector('p:nth-child(2)');
             if (uploadedFiles.length > 5) {
-                existingMsg.innerHTML = `<strong>Processing ${uploadedFiles.length} files in ${estimatedBatches} batches...</strong>`;
-                const subtext = loadingMessages.querySelector('.subtext');
-                subtext.textContent = `Estimated time: ${estimatedTime}-${estimatedTime + 60} seconds | Batch size: ${batchSize} files`;
-                
-                let batchProgressDiv = document.getElementById('batchProgress');
-                if (!batchProgressDiv) {
-                    batchProgressDiv = document.createElement('div');
-                    batchProgressDiv.id = 'batchProgress';
-                    batchProgressDiv.style.cssText = 'margin-top: 20px; color: #666; font-size: 0.9em;';
-                    loadingMessages.appendChild(batchProgressDiv);
-                }
-                batchProgressDiv.textContent = `Processing in batches for optimal performance...`;
+                existingMsg.innerHTML = `<strong>Processing ${uploadedFiles.length} files in ${estimatedBatches} batches using AI...</strong>`;
+                const subtext = loading.querySelector('.subtext');
+                subtext.textContent = `Estimated time: ${estimatedTime}-${estimatedTime + 90} seconds | Using Puter.js AI`;
             }
-            
-            const formData = new FormData();
-            formData.append('dd_type', document.getElementById('ddType').value);
-            formData.append('report_focus', document.getElementById('reportFocus').value);
-            formData.append('checklist_type', selectedChecklistType);
-            
-            uploadedFiles.forEach(file => {
-                formData.append('files', file);
-            });
-            
+
             try {
-                const response = await fetch('/analyze', {
+                // Send files to backend for text extraction only
+                const formData = new FormData();
+                formData.append('dd_type', document.getElementById('ddType').value);
+                formData.append('report_focus', document.getElementById('reportFocus').value);
+                formData.append('checklist_type', selectedChecklistType);
+                
+                uploadedFiles.forEach(file => {
+                    formData.append('files', file);
+                });
+
+                // Step 1: Extract text from files (backend only does this)
+                const extractResponse = await fetch('/extract-text', {
                     method: 'POST',
                     body: formData
                 });
-                
-                if (!response.ok) {
-                    const errorData = await response.json();
-                    throw new Error(errorData.error || 'Analysis failed');
+
+                if (!extractResponse.ok) {
+                    const errorData = await extractResponse.json();
+                    throw new Error(errorData.error || 'Failed to extract text from files');
                 }
+
+                const extractionResult = await extractResponse.json();
+                const allDocuments = extractionResult.documents;
                 
-                const data = await response.json();
+                console.log(`✓ Extracted text from ${allDocuments.length} documents`);
+
+                // Step 2: Process in batches using Puter.js (frontend AI)
+                const batches = createBatches(allDocuments, batchSize);
+                const batchReports = [];
+
+                for (let batchNum = 0; batchNum < batches.length; batchNum++) {
+                    const batch = batches[batchNum];
+                    
+                    // Update progress
+                    const batchProgressDiv = document.getElementById('batchProgress') || createBatchProgress();
+                    batchProgressDiv.textContent = `Processing batch ${batchNum + 1} of ${batches.length}...`;
+                    
+                    try {
+                        const batchReport = await window.puterAIClient.analyzeBatch(
+                            batch,
+                            batchNum + 1,
+                            batches.length,
+                            document.getElementById('ddType').value,
+                            document.getElementById('reportFocus').value
+                        );
+                        
+                        batchReports.push({
+                            batch_number: batchNum + 1,
+                            file_count: batch.length,
+                            files: batch.map(doc => doc.filename),
+                            report: batchReport
+                        });
+                        
+                        console.log(`✓ Batch ${batchNum + 1} completed`);
+                    } catch (batchError) {
+                        console.error(`✗ Batch ${batchNum + 1} failed:`, batchError);
+                        // Continue with other batches
+                    }
+                }
+
+                if (batchReports.length === 0) {
+                    throw new Error('All batches failed to process');
+                }
+
+                // Step 3: Synthesize final report
+                const batchProgressDiv = document.getElementById('batchProgress');
+                if (batchProgressDiv) {
+                    batchProgressDiv.textContent = 'Synthesizing final report...';
+                }
+
+                const finalReport = await window.puterAIClient.synthesizeReports(
+                    batchReports,
+                    document.getElementById('ddType').value,
+                    document.getElementById('reportFocus').value,
+                    selectedChecklistType,
+                    uploadedFiles.length
+                );
+
+                // Step 4: Display results
+                currentReport = finalReport;
+                reportContent.textContent = finalReport;
                 
-                currentReport = data.report;
-                reportContent.textContent = data.report;
-                
-                if (data.charts) {
-                    document.getElementById('chartsContainer').innerHTML = data.charts;
-                    document.getElementById('chartsSection').style.display = 'block';
-                } else {
+                // Generate charts if available
+                try {
+                    const chartsResponse = await fetch('/generate-charts', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({ report: finalReport })
+                    });
+                    
+                    if (chartsResponse.ok) {
+                        const chartsData = await chartsResponse.json();
+                        document.getElementById('chartsContainer').innerHTML = chartsData.charts;
+                        document.getElementById('chartsSection').style.display = 'block';
+                    }
+                } catch (chartError) {
+                    console.log('Chart generation skipped:', chartError);
                     document.getElementById('chartsSection').style.display = 'none';
                 }
-                
-                if (data.batches_processed && data.batches_processed > 1) {
-                    const batchInfo = document.createElement('div');
-                    batchInfo.style.cssText = 'background: #e8f4ff; padding: 15px; border-radius: 6px; margin-bottom: 20px; border-left: 4px solid #007bff;';
-                    batchInfo.innerHTML = `
-                        <strong>📊 Batch Processing Summary</strong><br>
-                        <span style="color: #666; font-size: 0.9em;">
-                            Processed ${data.total_files} files in ${data.batches_processed} batches | 
-                            Total time: ${data.processing_time}
-                        </span>
-                    `;
-                    const reportActions = document.querySelector('.report-actions');
-                    reportActions.parentNode.insertBefore(batchInfo, reportActions);
-                }
-                
+
                 loading.style.display = 'none';
                 reportSection.style.display = 'block';
                 reportSection.scrollIntoView({ behavior: 'smooth' });
-                
+
             } catch (error) {
                 loading.style.display = 'none';
                 errorDiv.style.display = 'block';
                 errorMessage.textContent = error.message;
+                console.error('Analysis error:', error);
+            } finally {
                 analyzeBtn.disabled = false;
             }
         });
+
+        // Helper functions
+        function createBatches(documents, batchSize) {
+            const batches = [];
+            for (let i = 0; i < documents.length; i += batchSize) {
+                batches.push(documents.slice(i, i + batchSize));
+            }
+            return batches;
+        }
+
+        function createBatchProgress() {
+            const div = document.createElement('div');
+            div.id = 'batchProgress';
+            div.style.cssText = 'margin-top: 20px; color: #666; font-size: 0.9em;';
+            loading.appendChild(div);
+            return div;
+        }
         
         function resetForm() {
             uploadedFiles = [];
