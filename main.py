@@ -73,8 +73,92 @@ def generate_charts():
         print(f"Chart generation error: {e}")
         return jsonify({'error': f'Chart generation failed: {str(e)}'}), 500
 
-# Keep all the existing file processing functions (extract_all_files, extract_zip_file, extract_pdf_from_bytes, extract_pdf_text)
-# Keep the download-pdf function exactly as is
+@app.route('/download-pdf', methods=['POST'])
+def download_pdf():
+    """Generate and download PDF report"""
+    try:
+        data = request.get_json()
+        report_text = data.get('report', '')
+        
+        if not report_text:
+            return jsonify({'error': 'No report content provided'}), 400
+        
+        # Create PDF
+        pdf_buffer = BytesIO()
+        doc = SimpleDocTemplate(pdf_buffer, pagesize=letter, 
+                               rightMargin=72, leftMargin=72,
+                               topMargin=72, bottomMargin=18)
+        
+        story = []
+        styles = getSampleStyleSheet()
+        
+        # Custom styles
+        title_style = ParagraphStyle(
+            'CustomTitle',
+            parent=styles['Heading1'],
+            fontSize=24,
+            textColor='#2c3e50',
+            spaceAfter=30,
+            alignment=TA_CENTER
+        )
+        
+        heading_style = ParagraphStyle(
+            'CustomHeading',
+            parent=styles['Heading2'],
+            fontSize=16,
+            textColor='#34495e',
+            spaceAfter=12,
+            spaceBefore=12
+        )
+        
+        body_style = ParagraphStyle(
+            'CustomBody',
+            parent=styles['BodyText'],
+            fontSize=11,
+            leading=16,
+            spaceAfter=12
+        )
+        
+        # Parse report text
+        lines = report_text.split('\n')
+        
+        for line in lines:
+            line = line.strip()
+            if not line:
+                story.append(Spacer(1, 0.2*inch))
+                continue
+            
+            # Detect headers
+            if line.startswith('# '):
+                text = line[2:].strip()
+                story.append(Paragraph(text, title_style))
+            elif line.startswith('## '):
+                text = line[3:].strip()
+                story.append(Paragraph(text, heading_style))
+            elif line.startswith('==='):
+                story.append(Spacer(1, 0.1*inch))
+            else:
+                # Regular text
+                # Escape XML special characters
+                text = line.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
+                story.append(Paragraph(text, body_style))
+        
+        # Build PDF
+        doc.build(story)
+        pdf_buffer.seek(0)
+        
+        return send_file(
+            pdf_buffer,
+            mimetype='application/pdf',
+            as_attachment=True,
+            download_name='Due_Diligence_Report.pdf'
+        )
+    
+    except Exception as e:
+        print(f"PDF generation error: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': f'PDF generation failed: {str(e)}'}), 500
 
 def extract_all_files(files):
     """Extract text from all uploaded files"""
@@ -154,11 +238,6 @@ def extract_pdf_text(file):
     except Exception as e:
         print(f"File read error: {e}")
         return None
-
-# Keep the download-pdf function exactly as before
-@app.route('/download-pdf', methods=['POST'])
-def download_pdf():
-    # ... keep the exact same implementation you have now
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 10000))
