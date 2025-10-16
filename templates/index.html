@@ -954,3 +954,715 @@
             document.getElementById('reportSection').style.display = 'block';
             document.getElementById('chartsSection').style.display = 'none';
             document.getElementById('reportSection').scrollIntoView({ behavior: 'smooth' });
+        }
+        
+        function deleteHistoryReport(index) {
+            if (confirm('Are you sure you want to delete this report?')) {
+                reportHistory.splice(index, 1);
+                saveHistory();
+                renderHistory();
+                
+                if (reportHistory.length === 0) {
+                    document.getElementById('reportHistory').style.display = 'none';
+                }
+            }
+        }
+        
+        function saveReport() {
+            if (!currentReport) return;
+            
+            const timestamp = new Date().toLocaleString();
+            const report = {
+                title: `Due Diligence Report - ${new Date().toLocaleDateString()}`,
+                date: timestamp,
+                content: currentReport,
+                fileCount: uploadedFiles.length,
+                ddType: document.getElementById('ddType').value,
+                reportFocus: document.getElementById('reportFocus').value,
+                checklistType: selectedChecklistType
+            };
+            
+            reportHistory.unshift(report);
+            
+            if (reportHistory.length > 20) {
+                reportHistory = reportHistory.slice(0, 20);
+            }
+            
+            saveHistory();
+            renderHistory();
+            document.getElementById('reportHistory').style.display = 'block';
+            
+            const successMsg = document.getElementById('successMessage');
+            successMsg.style.display = 'block';
+            setTimeout(() => {
+                successMsg.style.display = 'none';
+            }, 3000);
+        }
+        
+        function downloadReport() {
+            if (!currentReport) return;
+            
+            const blob = new Blob([currentReport], { type: 'text/plain' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            
+            const date = new Date().toISOString().split('T')[0];
+            const ddType = document.getElementById('ddType').value.replace(/\s+/g, '_');
+            const reportFocus = document.getElementById('reportFocus').value.replace(/\s+/g, '_');
+            
+            a.download = `${ddType}_${reportFocus}_${date}.txt`;
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+        }
+        
+        function downloadPDFReport() {
+            if (!currentReport) {
+                alert('No report available to download');
+                return;
+            }
+            
+            const btn = event.target;
+            const originalText = btn.textContent;
+            btn.textContent = 'Generating PDF...';
+            btn.disabled = true;
+            
+            fetch('/download-pdf', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    report: currentReport
+                })
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('PDF generation failed');
+                }
+                return response.blob();
+            })
+            .then(blob => {
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                
+                const date = new Date().toISOString().split('T')[0];
+                a.download = `Due_Diligence_Report_${date}.pdf`;
+                
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+                document.body.removeChild(a);
+                
+                btn.textContent = originalText;
+                btn.disabled = false;
+            })
+            .catch(error => {
+                alert('Failed to generate PDF: ' + error.message);
+                btn.textContent = originalText;
+                btn.disabled = false;
+            });
+        }
+        
+        function downloadHTMLReport() {
+            if (!currentReport) return;
+            
+            const chartsHTML = document.getElementById('chartsContainer').innerHTML;
+            const reportText = document.getElementById('reportContent').textContent;
+            
+            const fullHTML = `
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Due Diligence Report</title>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 40px;
+            background: white;
+            color: #000;
+        }
+        h1 { color: #2c3e50; border-bottom: 3px solid #3498db; padding-bottom: 10px; }
+        h2 { color: #34495e; margin-top: 30px; }
+        .report-text {
+            background: #f8f9fa;
+            padding: 30px;
+            border-radius: 8px;
+            white-space: pre-wrap;
+            line-height: 1.8;
+            margin-top: 30px;
+        }
+        .dashboard {
+            margin: 30px 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>Financial Due Diligence Report</h1>
+    <p><strong>Generated:</strong> ${new Date().toLocaleString()}</p>
+    <p><strong>Platform:</strong> Seggy the Analyst</p>
+    
+    <div class="dashboard">
+        <h2>Executive Dashboard</h2>
+        ${chartsHTML}
+    </div>
+    
+    <div class="report-text">
+        <h2>Detailed Analysis</h2>
+        ${reportText}
+    </div>
+</body>
+</html>
+            `;
+            
+            const blob = new Blob([fullHTML], { type: 'text/html' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            
+            const date = new Date().toISOString().split('T')[0];
+            a.download = `Due_Diligence_Report_${date}.html`;
+            
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+        }
+        
+        const simpleChecklistConfig = [
+            { name: 'Form 10-K (Last 3 Years)', required: 3, patterns: ['10-k', '10k'], years: [2024, 2023, 2022] },
+            { name: 'Form 10-Q (Last 8 Quarters)', required: 8, patterns: ['10-q', '10q'], years: ['Q1 2024', 'Q2 2024', 'Q3 2024', 'Q4 2023', 'Q1 2023', 'Q2 2023', 'Q3 2023', 'Q4 2022'] },
+            { name: 'Most Recent Earnings Release', required: 1, patterns: ['earnings', 'release'] },
+            { name: 'Proxy Statement DEF 14A (Last 2 Years)', required: 2, patterns: ['def 14a', 'def14a', 'proxy'], years: [2024, 2023] },
+            { name: 'Investor Relations Data Supplement', required: 1, patterns: ['investor relations', 'ir data', 'data supplement'] },
+            { name: 'Debt Prospectus/Indentures', required: 1, patterns: ['debt', 'prospectus', 'indenture'] },
+            { name: 'Balance Sheets', required: 1, patterns: ['balance sheet', 'balance_sheet'] },
+            { name: 'Income Statements', required: 1, patterns: ['income statement', 'income_statement', 'profit loss', 'p&l'] },
+            { name: 'Cash Flow Statements', required: 1, patterns: ['cash flow', 'cashflow', 'statement of cash'] },
+            { name: 'Tax Returns (Last 3 Years)', required: 3, patterns: ['tax return', 'tax_return', 'form 1120', '1040'], years: [2023, 2022, 2021] },
+            { name: 'Accounts Receivable Aging Reports', required: 1, patterns: ['accounts receivable', 'ar aging', 'receivable aging', 'a/r'] },
+            { name: 'Accounts Payable Reports', required: 1, patterns: ['accounts payable', 'ap report', 'payable', 'a/p'] },
+            { name: 'Inventory Reports', required: 1, patterns: ['inventory', 'stock report'] },
+            { name: 'Fixed Assets List', required: 1, patterns: ['fixed asset', 'asset list', 'ppe', 'property plant equipment'] },
+            { name: 'Debt Schedule', required: 1, patterns: ['debt schedule', 'loan agreement', 'credit facility'] },
+            { name: 'Customer Contracts', required: 1, patterns: ['customer contract', 'sales contract', 'customer agreement'] },
+            { name: 'Supplier Agreements', required: 1, patterns: ['supplier', 'vendor agreement', 'purchase agreement'] },
+            { name: 'Credit Reports', required: 1, patterns: ['credit report', 'credit rating'] },
+            { name: 'Audit Reports', required: 1, patterns: ['audit report', 'auditor', 'independent audit'] },
+            { name: 'Management Projections', required: 1, patterns: ['projection', 'forecast', 'budget'] }
+        ];
+        
+        const detailedChecklistConfig = [
+            ...simpleChecklistConfig,
+            { name: 'Form 10-K (Years 4-5)', required: 2, patterns: ['10-k', '10k'], years: [2021, 2020] },
+            { name: 'Form 10-Q (Quarters 9-12)', required: 4, patterns: ['10-q', '10q'], years: ['Q1 2022', 'Q2 2022', 'Q3 2022', 'Q4 2021'] },
+            { name: 'All Form 8-Ks (Last 2 Years)', required: 5, patterns: ['8-k', '8k'] },
+            { name: 'Forms 3, 4, and 5 (Insider Trading)', required: 3, patterns: ['form 3', 'form 4', 'form 5', 'insider'] },
+            { name: 'Schedule 13D/13G Filings', required: 1, patterns: ['13d', '13g', 'schedule 13'] },
+            { name: 'Statement of Shareholders Equity', required: 1, patterns: ['shareholders equity', 'stockholders equity', 'equity statement'] },
+            { name: 'Tax Audit Reports', required: 1, patterns: ['tax audit', 'irs audit'] },
+            { name: 'Deferred Tax Analysis', required: 1, patterns: ['deferred tax', 'tax deferral'] },
+            { name: 'Depreciation Schedules', required: 1, patterns: ['depreciation', 'amortization schedule'] },
+            { name: 'Intangible Assets Valuation', required: 1, patterns: ['intangible', 'goodwill', 'patent valuation'] },
+            { name: 'Credit Facility Documents', required: 1, patterns: ['credit facility', 'credit agreement', 'revolving credit'] },
+            { name: 'Lease Agreements', required: 1, patterns: ['lease', 'rental agreement'] },
+            { name: 'Employment Agreements', required: 1, patterns: ['employment agreement', 'employment contract'] },
+            { name: 'Stock Option Plans', required: 1, patterns: ['stock option', 'equity plan', 'esop'] },
+            { name: 'Pension Plan Documents', required: 1, patterns: ['pension', '401k', 'retirement plan'] },
+            { name: 'Insurance Policies', required: 1, patterns: ['insurance', 'policy'] },
+            { name: 'Litigation Documents', required: 1, patterns: ['litigation', 'lawsuit', 'legal proceeding'] },
+            { name: 'Regulatory Filings', required: 1, patterns: ['regulatory', 'compliance filing'] },
+            { name: 'IT Systems Documentation', required: 1, patterns: ['it system', 'technology', 'software'] },
+            { name: 'Intellectual Property List', required: 1, patterns: ['intellectual property', 'ip', 'patent list', 'trademark'] }
+        ];
+        
+        let checklistState = {};
+        
+        const uploadSection = document.getElementById('uploadSection');
+        const fileInput = document.getElementById('fileInput');
+        const specificFileInput = document.getElementById('specificFileInput');
+        const yearFileInput = document.getElementById('yearFileInput');
+        const analyzeBtn = document.getElementById('analyzeBtn');
+        const loading = document.getElementById('loading');
+        const reportSection = document.getElementById('reportSection');
+        const reportContent = document.getElementById('reportContent');
+        const errorDiv = document.getElementById('error');
+        const errorMessage = document.getElementById('errorMessage');
+        const documentChecklist = document.getElementById('documentChecklist');
+        const checklistItems = document.getElementById('checklistItems');
+        const uploadedFilesList = document.getElementById('uploadedFilesList');
+        const fileListContainer = document.getElementById('fileListContainer');
+        const fileCount = document.getElementById('fileCount');
+        const checklistSummary = document.getElementById('checklistSummary');
+        const progressFill = document.getElementById('progressFill');
+        const progressText = document.getElementById('progressText');
+        const yearModal = document.getElementById('yearModal');
+        
+        loadHistory();
+        
+        document.querySelectorAll('.checklist-btn').forEach(btn => {
+            btn.addEventListener('click', function() {
+                document.querySelectorAll('.checklist-btn').forEach(b => b.classList.remove('active'));
+                this.classList.add('active');
+                selectedChecklistType = this.getAttribute('data-type');
+                updateChecklist();
+                updateChecklistStatus();
+            });
+        });
+        
+        function updateChecklist() {
+            const config = selectedChecklistType === 'Simple' ? simpleChecklistConfig : detailedChecklistConfig;
+            
+            checklistState = {};
+            config.forEach((item, index) => {
+                checklistState[index] = { 
+                    uploaded: 0, 
+                    required: item.required,
+                    files: [],
+                    yearFiles: item.years ? {} : null
+                };
+                if (item.years) {
+                    item.years.forEach(year => {
+                        checklistState[index].yearFiles[year] = null;
+                    });
+                }
+            });
+            
+            checklistItems.innerHTML = '';
+            
+            config.forEach((item, index) => {
+                const div = document.createElement('div');
+                div.className = 'checklist-item clickable';
+                div.setAttribute('data-index', index);
+                div.onclick = () => openChecklistUpload(index);
+                div.innerHTML = `
+                    <div class="status-indicator status-red"></div>
+                    <div class="checklist-item-content">
+                        <div class="checklist-item-title">${item.name}</div>
+                        <div class="checklist-item-status">0 of ${item.required} uploaded</div>
+                    </div>
+                    <div class="upload-icon-small">Upload</div>
+                `;
+                checklistItems.appendChild(div);
+            });
+            
+            updateSummary();
+        }
+        
+        function openChecklistUpload(index) {
+            const config = selectedChecklistType === 'Simple' ? simpleChecklistConfig : detailedChecklistConfig;
+            const item = config[index];
+            currentChecklistIndex = index;
+            
+            document.getElementById('modalTitle').textContent = item.name;
+            
+            if (item.years && item.years.length > 0) {
+                document.getElementById('modalDescription').textContent = 'Select the year for this document:';
+                const yearOptions = document.getElementById('yearOptions');
+                yearOptions.innerHTML = '';
+                
+                item.years.forEach(year => {
+                    const uploaded = checklistState[index].yearFiles[year];
+                    const div = document.createElement('div');
+                    div.className = 'year-option' + (uploaded ? ' uploaded' : '');
+                    div.onclick = () => selectYear(year);
+                    div.innerHTML = `
+                        <span class="year-label">${year}</span>
+                        ${uploaded ? '<span class="year-status">Uploaded ✓</span>' : ''}
+                    `;
+                    yearOptions.appendChild(div);
+                });
+                
+                document.querySelector('.single-upload-btn').style.display = 'none';
+            } else {
+                document.getElementById('modalDescription').textContent = 'Click below to upload this document:';
+                document.getElementById('yearOptions').innerHTML = '';
+                document.querySelector('.single-upload-btn').style.display = 'block';
+            }
+            
+            yearModal.style.display = 'block';
+        }
+        
+        function selectYear(year) {
+            currentYearSelection = year;
+            yearFileInput.click();
+        }
+        
+        function triggerSingleUpload() {
+            currentYearSelection = null;
+            specificFileInput.click();
+        }
+        
+        function closeYearModal() {
+            yearModal.style.display = 'none';
+            currentChecklistIndex = null;
+            currentYearSelection = null;
+        }
+        
+        specificFileInput.addEventListener('change', (e) => {
+            const files = Array.from(e.target.files);
+            if (files.length > 0 && currentChecklistIndex !== null) {
+                handleSpecificUpload(files, currentChecklistIndex, null);
+            }
+            specificFileInput.value = '';
+        });
+        
+        yearFileInput.addEventListener('change', (e) => {
+            const files = Array.from(e.target.files);
+            if (files.length > 0 && currentChecklistIndex !== null && currentYearSelection !== null) {
+                handleSpecificUpload(files, currentChecklistIndex, currentYearSelection);
+            }
+            yearFileInput.value = '';
+        });
+        
+        function handleSpecificUpload(files, checklistIndex, year) {
+            files.forEach(file => {
+                uploadedFiles.push(file);
+                
+                if (!fileMapping[file.name]) {
+                    fileMapping[file.name] = [];
+                }
+                fileMapping[file.name].push({ index: checklistIndex, year: year });
+                
+                if (year) {
+                    checklistState[checklistIndex].yearFiles[year] = file.name;
+                }
+                checklistState[checklistIndex].files.push(file.name);
+                if (checklistState[checklistIndex].uploaded < checklistState[checklistIndex].required) {
+                    checklistState[checklistIndex].uploaded++;
+                }
+            });
+            
+            updateFileList();
+            updateChecklistStatus();
+            analyzeBtn.style.display = 'inline-block';
+            closeYearModal();
+        }
+        
+        function matchFileToChecklist(filename) {
+            const config = selectedChecklistType === 'Simple' ? simpleChecklistConfig : detailedChecklistConfig;
+            const lowerFilename = filename.toLowerCase();
+            const matches = [];
+            
+            config.forEach((item, index) => {
+                const hasMatch = item.patterns.some(pattern => 
+                    lowerFilename.includes(pattern.toLowerCase())
+                );
+                
+                if (hasMatch) {
+                    matches.push(index);
+                }
+            });
+            
+            return matches;
+        }
+        
+        function updateChecklistStatus() {
+            const config = selectedChecklistType === 'Simple' ? simpleChecklistConfig : detailedChecklistConfig;
+            
+            Object.keys(checklistState).forEach(key => {
+                const specificCount = checklistState[key].files.length;
+                checklistState[key].uploaded = specificCount;
+            });
+            
+            uploadedFiles.forEach(file => {
+                const isSpecific = fileMapping[file.name] && fileMapping[file.name].length > 0;
+                if (!isSpecific) {
+                    const matches = matchFileToChecklist(file.name);
+                    matches.forEach(matchIndex => {
+                        if (checklistState[matchIndex].uploaded < checklistState[matchIndex].required) {
+                            checklistState[matchIndex].uploaded++;
+                        }
+                    });
+                }
+            });
+            
+            Object.keys(checklistState).forEach(index => {
+                const state = checklistState[index];
+                const item = document.querySelector(`.checklist-item[data-index="${index}"]`);
+                if (!item) return;
+                
+                const indicator = item.querySelector('.status-indicator');
+                const statusText = item.querySelector('.checklist-item-status');
+                
+                indicator.classList.remove('status-red', 'status-yellow', 'status-green');
+                
+                if (state.uploaded === 0) {
+                    indicator.classList.add('status-red');
+                } else if (state.uploaded < state.required) {
+                    indicator.classList.add('status-yellow');
+                } else {
+                    indicator.classList.add('status-green');
+                }
+                
+                statusText.textContent = `${state.uploaded} of ${state.required} uploaded`;
+            });
+            
+            updateSummary();
+        }
+        
+        function updateSummary() {
+            const config = selectedChecklistType === 'Simple' ? simpleChecklistConfig : detailedChecklistConfig;
+            const totalItems = config.length;
+            let completedItems = 0;
+            
+            Object.keys(checklistState).forEach(key => {
+                const state = checklistState[key];
+                if (state.uploaded >= state.required) {
+                    completedItems++;
+                }
+            });
+            
+            const percentage = Math.round((completedItems / totalItems) * 100);
+            
+            checklistSummary.textContent = `${completedItems} of ${totalItems} completed`;
+            progressFill.style.width = `${percentage}%`;
+            
+            if (completedItems === 0) {
+                progressText.textContent = 'Upload documents to begin or click items below to upload specific files';
+            } else if (completedItems === totalItems) {
+                progressText.textContent = 'All required documents uploaded!';
+            } else {
+                progressText.textContent = `${percentage}% complete - ${totalItems - completedItems} items remaining`;
+            }
+        }
+        
+        updateChecklist();
+        
+        uploadSection.addEventListener('click', () => fileInput.click());
+        
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            uploadSection.addEventListener(eventName, (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+            });
+        });
+        
+        ['dragenter', 'dragover'].forEach(eventName => {
+            uploadSection.addEventListener(eventName, () => {
+                uploadSection.classList.add('dragging');
+            });
+        });
+        
+        ['dragleave', 'drop'].forEach(eventName => {
+            uploadSection.addEventListener(eventName, () => {
+                uploadSection.classList.remove('dragging');
+            });
+        });
+        
+        uploadSection.addEventListener('drop', (e) => {
+            const dt = e.dataTransfer;
+            const files = Array.from(dt.files);
+            handleFiles(files);
+        });
+        
+        fileInput.addEventListener('change', (e) => {
+            const files = Array.from(e.target.files);
+            handleFiles(files);
+        });
+        
+        function handleFiles(files) {
+            const hasZip = files.some(f => f.name.toLowerCase().endsWith('.zip'));
+            
+            if (hasZip) {
+                document.getElementById('extractingZip').style.display = 'block';
+            }
+            
+            uploadedFiles = [...uploadedFiles, ...files];
+            updateFileList();
+            updateChecklistStatus();
+            analyzeBtn.style.display = 'inline-block';
+            errorDiv.style.display = 'none';
+            
+            if (hasZip) {
+                setTimeout(() => {
+                    document.getElementById('extractingZip').style.display = 'none';
+                }, 2000);
+            }
+        }
+        
+        function updateFileList() {
+            if (uploadedFiles.length === 0) {
+                uploadedFilesList.style.display = 'none';
+                return;
+            }
+            
+            uploadedFilesList.style.display = 'block';
+            fileCount.textContent = uploadedFiles.length;
+            fileListContainer.innerHTML = '';
+            
+            uploadedFiles.forEach((file, index) => {
+                const div = document.createElement('div');
+                div.className = 'uploaded-file-item';
+                
+                const mapping = fileMapping[file.name];
+                let tagHtml = '';
+                if (mapping && mapping.length > 0) {
+                    const config = selectedChecklistType === 'Simple' ? simpleChecklistConfig : detailedChecklistConfig;
+                    const itemName = config[mapping[0].index].name;
+                    const shortName = itemName.split('(')[0].trim();
+                    tagHtml = `<span class="file-tag">${shortName}${mapping[0].year ? ' - ' + mapping[0].year : ''}</span>`;
+                }
+                
+                const isZip = file.name.toLowerCase().endsWith('.zip');
+                const zipTag = isZip ? '<span class="file-tag" style="background: #fff3cd; color: #856404;">ZIP Archive</span>' : '';
+                
+                div.innerHTML = `
+                    <div>
+                        <span class="file-name">${file.name}</span>
+                        ${tagHtml}
+                        ${zipTag}
+                    </div>
+                    <button class="remove-file-btn" onclick="removeFile(${index})">Remove</button>
+                `;
+                fileListContainer.appendChild(div);
+            });
+        }
+        
+        function removeFile(index) {
+            const file = uploadedFiles[index];
+            
+            if (fileMapping[file.name]) {
+                fileMapping[file.name].forEach(mapping => {
+                    const state = checklistState[mapping.index];
+                    const fileIndex = state.files.indexOf(file.name);
+                    if (fileIndex > -1) {
+                        state.files.splice(fileIndex, 1);
+                        state.uploaded = Math.max(0, state.uploaded - 1);
+                    }
+                    if (mapping.year && state.yearFiles) {
+                        state.yearFiles[mapping.year] = null;
+                    }
+                });
+                delete fileMapping[file.name];
+            }
+            
+            uploadedFiles.splice(index, 1);
+            updateFileList();
+            updateChecklistStatus();
+            
+            if (uploadedFiles.length === 0) {
+                analyzeBtn.style.display = 'none';
+            }
+        }
+        
+        analyzeBtn.addEventListener('click', async () => {
+            if (uploadedFiles.length === 0) {
+                alert('Please upload at least one file');
+                return;
+            }
+            
+            const batchSize = 5;
+            const estimatedBatches = Math.ceil(uploadedFiles.length / batchSize);
+            const estimatedTime = estimatedBatches * 30;
+            
+            loading.style.display = 'block';
+            reportSection.style.display = 'none';
+            errorDiv.style.display = 'none';
+            analyzeBtn.disabled = true;
+            
+            const loadingMessages = document.querySelector('.loading');
+            const existingMsg = loadingMessages.querySelector('p:nth-child(2)');
+            
+            if (uploadedFiles.length > 5) {
+                existingMsg.innerHTML = `<strong>Processing ${uploadedFiles.length} files in ${estimatedBatches} batches...</strong>`;
+                const subtext = loadingMessages.querySelector('.subtext');
+                subtext.textContent = `Estimated time: ${estimatedTime}-${estimatedTime + 60} seconds | Batch size: ${batchSize} files`;
+                
+                let batchProgressDiv = document.getElementById('batchProgress');
+                if (!batchProgressDiv) {
+                    batchProgressDiv = document.createElement('div');
+                    batchProgressDiv.id = 'batchProgress';
+                    batchProgressDiv.style.cssText = 'margin-top: 20px; color: #666; font-size: 0.9em;';
+                    loadingMessages.appendChild(batchProgressDiv);
+                }
+                batchProgressDiv.textContent = `Processing in batches for optimal performance...`;
+            }
+            
+            const formData = new FormData();
+            formData.append('dd_type', document.getElementById('ddType').value);
+            formData.append('report_focus', document.getElementById('reportFocus').value);
+            formData.append('checklist_type', selectedChecklistType);
+            
+            uploadedFiles.forEach(file => {
+                formData.append('files', file);
+            });
+            
+            try {
+                const response = await fetch('/analyze', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error || 'Analysis failed');
+                }
+                
+                const data = await response.json();
+                
+                currentReport = data.report;
+                reportContent.textContent = data.report;
+                
+                if (data.charts) {
+                    document.getElementById('chartsContainer').innerHTML = data.charts;
+                    document.getElementById('chartsSection').style.display = 'block';
+                } else {
+                    document.getElementById('chartsSection').style.display = 'none';
+                }
+                
+                if (data.batches_processed && data.batches_processed > 1) {
+                    const batchInfo = document.createElement('div');
+                    batchInfo.style.cssText = 'background: #e8f4ff; padding: 15px; border-radius: 6px; margin-bottom: 20px; border-left: 4px solid #007bff;';
+                    batchInfo.innerHTML = `
+                        <strong>📊 Batch Processing Summary</strong><br>
+                        <span style="color: #666; font-size: 0.9em;">
+                            Processed ${data.total_files} files in ${data.batches_processed} batches | 
+                            Total time: ${data.processing_time}
+                        </span>
+                    `;
+                    const reportActions = document.querySelector('.report-actions');
+                    reportActions.parentNode.insertBefore(batchInfo, reportActions);
+                }
+                
+                loading.style.display = 'none';
+                reportSection.style.display = 'block';
+                reportSection.scrollIntoView({ behavior: 'smooth' });
+                
+            } catch (error) {
+                loading.style.display = 'none';
+                errorDiv.style.display = 'block';
+                errorMessage.textContent = error.message;
+                analyzeBtn.disabled = false;
+            }
+        });
+        
+        function resetForm() {
+            uploadedFiles = [];
+            currentReport = null;
+            fileMapping = {};
+            updateFileList();
+            updateChecklist();
+            reportSection.style.display = 'none';
+            errorDiv.style.display = 'none';
+            analyzeBtn.style.display = 'none';
+            analyzeBtn.disabled = false;
+            fileInput.value = '';
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+        
+        window.onclick = function(event) {
+            if (event.target == yearModal) {
+                closeYearModal();
+            }
+        }
+    </script>
+</body>
+</html>
